@@ -13,7 +13,7 @@ import numpy as np
 
 import requests
 
-from .. import LightkurveError
+from lightkurve import LightkurveError
 from .core import ProperMotionCorrectionMeta, InteractSkyCatalogProvider
 
 log = logging.getLogger(__name__)

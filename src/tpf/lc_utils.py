@@ -9,7 +9,7 @@ import numpy as np
 
 import lightkurve as lk
 
-from lightkurve.interact_sky_providers.skypatrol2 import get_lightcurve
+from .lk_patch.interact_sky_providers.skypatrol2 import get_lightcurve
 
 
 def read_ztf_csv(

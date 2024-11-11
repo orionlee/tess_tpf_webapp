@@ -10,7 +10,7 @@ import astroquery.vizier as vizier
 import numpy as np
 
 import lightkurve as lk
-from lightkurve.interact import show_skyview_widget, prepare_lightcurve_datasource, make_lightcurve_figure_elements, show_interact_widget, _get_corrected_coordinate
+from .lk_patch.interact import show_skyview_widget, prepare_lightcurve_datasource, make_lightcurve_figure_elements, show_interact_widget, _get_corrected_coordinate
 from .ext_gaia_tic import ExtendedGaiaDR3TICInteractSkyCatalogProvider
 from .tpf_utils import get_tpf, is_tesscut
 from .lc_utils import read_lc, guess_lc_source

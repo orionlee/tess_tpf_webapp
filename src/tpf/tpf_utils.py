@@ -4,7 +4,7 @@ import warnings
 import astropy.units as u
 
 import lightkurve as lk
-from lightkurve.interact import _create_background_task
+from .lk_patch.interact import _create_background_task
 
 log = logging.getLogger(__name__)
 

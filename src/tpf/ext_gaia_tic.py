@@ -4,7 +4,7 @@ import urllib
 
 import astroquery.vizier as vizier
 
-from lightkurve.interact_sky_providers.gaia_tic import GaiaDR3TICInteractSkyCatalogProvider
+from .lk_patch.interact_sky_providers.gaia_tic import GaiaDR3TICInteractSkyCatalogProvider
 
 
 class ExtendedGaiaDR3TICInteractSkyCatalogProvider(GaiaDR3TICInteractSkyCatalogProvider):

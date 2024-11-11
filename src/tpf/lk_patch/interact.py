@@ -28,7 +28,7 @@ import astropy.units as u
 from astropy.utils.exceptions import AstropyUserWarning
 
 from .interact_sky_providers import resolve_catalog_provider_class
-from .utils import KeplerQualityFlags, LightkurveWarning, LightkurveError, finalize_notebook_url
+from lightkurve.utils import KeplerQualityFlags, LightkurveWarning, LightkurveError, finalize_notebook_url
 
 from .asyncio_compat import create_task, to_thread  # to be backward compatible with Python < 3.9
 
