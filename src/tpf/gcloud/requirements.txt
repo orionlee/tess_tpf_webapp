@@ -1,0 +1,4 @@
+lightkurve  @ git+https://github.com/orionlee/lightkurve@interact_sky_webapp
+# avoid bokeh 3.4.x for tap selection issue
+bokeh==3.3.4
+skypatrol>=0.6.16,<1.0
