@@ -15,6 +15,7 @@ mkdir -p $dest
 mkdir -p $dest/tpf
 
 cp --update --archive  $base/../*.py  $dest/tpf
+cp --update --archive  --recursive $base/../lk_patch  $dest/tpf
 cp --update --archive  $base/*  $dest
 cp --update --archive  $base/.*  $dest
 
