@@ -7,11 +7,32 @@ import astroquery.vizier as vizier
 from .lk_patch.interact_sky_providers.gaia_tic import GaiaDR3TICInteractSkyCatalogProvider
 
 
+def _del_all_after(dict_obj, key):
+    """Delete all keys of the given dictionary after the named key."""
+    key_found = False
+    # need to get a copy of the keys, to avoid
+    # the error of dictionary changed during iteration
+    keys = list(dict_obj.keys())
+    for k in keys:
+        if key_found:
+            dict_obj.pop(k, None)
+        elif k == key:
+            key_found = True
+
+
 class ExtendedGaiaDR3TICInteractSkyCatalogProvider(GaiaDR3TICInteractSkyCatalogProvider):
     """Custom extension to standard Gaia DR3 TIC provider."""
 
     def get_detail_view(self, data: dict) -> Tuple[dict, list]:
         key_vals, extra_rows = super().get_detail_view(data)
+
+        if key_vals["Source"] == "":
+            # case the entry has no Gaia DR3 match, simplify it
+            # by removing a bunch of Gaia specific entries
+            _del_all_after(key_vals, "row")  # entries after row are all Gaia DR3 values.
+            return key_vals, extra_rows
+
+        # case it has Gaia DR3 match, add additional data
 
         vizier_server = vizier.conf.server
 
