@@ -103,7 +103,12 @@ def make_lc_fig(url, period=None, epoch=None, epoch_format=None, use_cmap_for_fo
             lc_source.data["time_original"] = lc.time_original.value
 
         def ylim_func(lc):
-            return (np.nanmin(lc.flux).value, np.nanmax(lc.flux).value)
+            # hide extreme outliers, and add margin to top/bottom
+            # high cutoff at 99.9%, to optimize for transits / eclipses cases
+            #  (so as to preserve dips in considering outliers)
+            low, high = np.nanpercentile(lc.flux.value, (1, 99.9))
+            margin = 0.10 * (high - low)
+            return (low - margin, high + margin)
 
         fig_lc, vertical_line = make_lightcurve_figure_elements(lc, lc_source, ylim_func=ylim_func)
         fig_lc.name = "lc_fig"
