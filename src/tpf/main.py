@@ -717,7 +717,12 @@ async def create_app_body_ui(tic, sector, magnitude_limit=None):
     return await create_app_body_ui_from_tpf(tpf, magnitude_limit=magnitude_limit)
 
 
-async def create_app_body_ui_from_tpf(tpf, magnitude_limit=None):
+def get_default_catalogs_from_env():
+    catalogs_str = os.environ.get("TESS_TPF_WEBAPP_CATALOGS", "gaiadr3_tic,skypatrol2,ztf,vsx")
+    return [cat.strip() for cat in catalogs_str.split(",")]
+
+
+async def create_app_body_ui_from_tpf(tpf, magnitude_limit=None, catalogs=None):
     if magnitude_limit is None:
         # supply default
         magnitude_limit = tpf.meta.get("TESSMAG", 0)
@@ -735,12 +740,22 @@ async def create_app_body_ui_from_tpf(tpf, magnitude_limit=None):
     if tpf.time.max() - tpf.time.min() > 3:
         tpf = tpf[tpf.time.value > tpf.time.min().value + 3]
 
+    # a catalog can be disabled by excluding it in the catalogs param
+    # OPEN: consider to make the default configurable from an environment variable
+    # so that a catalog can be disabled after deployment
+    if catalogs is None:
+        catalogs = get_default_catalogs_from_env()
+
+    # the catalog strings are mapped to
+    # the catalog name / class and parameters
+
     vizier_server = vizier.conf.server
     ztf_search_radius = 90 * u.arcsec
     ztf_ngoodobsrel_min = 200
     skypatrol2_search_radius = 90 * u.arcsec
-    catalogs = [
-        (
+
+    catalogs_with_params_map = dict(
+        gaiadr3_tic=(
             ExtendedGaiaDR3TICInteractSkyCatalogProvider,
             dict(
                 extra_cols_in_detail_view={
@@ -758,10 +773,13 @@ async def create_app_body_ui_from_tpf(tpf, magnitude_limit=None):
                 ),
             ),
         ),
-        ("skypatrol2", dict(radius=skypatrol2_search_radius)),
-        ("ztf", dict(radius=ztf_search_radius, ngoodobsrel_min=ztf_ngoodobsrel_min)),
-        "vsx",
-    ]
+        skypatrol2=("skypatrol2", dict(radius=skypatrol2_search_radius)),
+        ztf=("ztf", dict(radius=ztf_search_radius, ngoodobsrel_min=ztf_ngoodobsrel_min)),
+        vsx="vsx",
+    )
+
+    catalogs_with_params = [catalogs_with_params_map[k] for k in catalogs]
+
     with warnings.catch_warnings():
         # Ignore warnings about no PM correction (happened to TessCut data)
         warnings.filterwarnings("ignore", message="Proper motion correction cannot", category=lk.LightkurveWarning)
@@ -770,7 +788,7 @@ async def create_app_body_ui_from_tpf(tpf, magnitude_limit=None):
             tpf,
             aperture_mask=tpf.pipeline_mask,
             magnitude_limit=magnitude_limit,
-            catalogs=catalogs,
+            catalogs=catalogs_with_params,
             return_type="doc_init_fn",
         )
 
