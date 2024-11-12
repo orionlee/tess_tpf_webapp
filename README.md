@@ -46,3 +46,6 @@ The webapp codes are at [`src/tpf`](src/tpf).
 The main features are built on top of [`lightkurve`](https://github.com/lightkurve/lightkurve/).
 Its interact features are patched to add more functionalities, and to work in an webapp.
 The patched codes are at [`src/tpf/lk_patch`](src/tpf/lk_patch).
+
+A [notebook](Playground.ipynb) can be used to make testing out changes more easily:
+one can test out changes to individual components, with reload support.
