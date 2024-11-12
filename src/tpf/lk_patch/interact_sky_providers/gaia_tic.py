@@ -236,7 +236,9 @@ class GaiaDR3InteractSkyCatalogProvider(VizierInteractSkyCatalogProvider):
             ]
         else:
             source_val_html = ""
-            extra_rows = []
+            extra_rows = [
+                f'<a target="_blank" href="{simbad_url_by_coord}">SIMBAD by coordinate</a>',
+            ]
 
         var_html = data["VarFlag"]
         if var_html == "VARIABLE":
