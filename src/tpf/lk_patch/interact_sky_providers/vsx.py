@@ -22,15 +22,11 @@ log = logging.getLogger(__name__)
 def _parse_limit_mag_uncertainty_band(text):
     # to handle case input is number (i.e., the origin astropy column is of type float)
     text = str(text)
-    if (
-        text == "--" or text == "nan"
-    ):  # string  representation of np.ma.masked and nan respectively
+    if text == "--" or text == "nan":  # string  representation of np.ma.masked and nan respectively
         return dict(l="", mag=np.nan, u="", band="")
 
     # handle text such as 12.9 V
-    matches = re.match(
-        r"\s*(?P<l>[><]?)(?P<mag>-?\d+([.]\d+)?)(?P<u>:?)\s*(?P<band>[^\s]*)", text
-    )
+    matches = re.match(r"\s*(?P<l>[><]?)(?P<mag>-?\d+([.]\d+)?)(?P<u>:?)\s*(?P<band>[^\s]*)", text)
     if matches is None:
         # parse unexpectedly failed, put the entire text in band for now
         # (as it's meant to be str)
@@ -45,14 +41,10 @@ def _parse_limit_mag_uncertainty_band(text):
 def _parse_limit_mag_amp_uncertainty_band(text):
     # to handle case input is number (i.e., the origin astropy column is of type float)
     text = str(text)
-    if (
-        text == "--" or text == "nan"
-    ):  # string  representation of np.ma.masked and nan respectively
+    if text == "--" or text == "nan":  # string  representation of np.ma.masked and nan respectively
         return dict(l="", mag=np.nan, u="", band="", a="")
 
-    no_amp_res = _parse_limit_mag_uncertainty_band(
-        text
-    )  # limit flag has already been extracted
+    no_amp_res = _parse_limit_mag_uncertainty_band(text)  # limit flag has already been extracted
     if not np.isnan(no_amp_res["mag"]):
         no_amp_res["a"] = ""
         return no_amp_res
@@ -74,9 +66,7 @@ def _parse_limit_mag_amp_uncertainty_band(text):
 def _parse_number_with_uncertainty_flag(text):
     # to handle case input is number (i.e., the origin astropy column is of type float)
     text = str(text)
-    if (
-        text == "--" or text == "nan"
-    ):  # string  representation of np.ma.masked and nan respectively
+    if text == "--" or text == "nan":  # string  representation of np.ma.masked and nan respectively
         return np.nan, ""
 
     matches = re.match(r"\s*(-?\d+([.]\d+)?)(:?)\s*", text)
@@ -169,9 +159,7 @@ def _parse_response(result):
         max_parsed = [_parse_limit_mag_uncertainty_band(v) for v in tab["MaxMag"]]
         tab["l_max"] = [t["l"] for t in max_parsed]
         tab["max"] = [t["mag"] for t in max_parsed]
-        tab["max"] = tab["max"].astype(
-            float
-        )  # needed in case if the parsed data has nan
+        tab["max"] = tab["max"].astype(float)  # needed in case if the parsed data has nan
         tab["max"].unit = u.mag
         tab["u_max"] = [t["u"] for t in max_parsed]
         tab["n_max"] = [t["band"] for t in max_parsed]
@@ -181,9 +169,7 @@ def _parse_response(result):
         min_parsed = [_parse_limit_mag_amp_uncertainty_band(v) for v in tab["MinMag"]]
         tab["l_min"] = [t["l"] for t in min_parsed]
         tab["min"] = [t["mag"] for t in min_parsed]
-        tab["min"] = tab["min"].astype(
-            float
-        )  # needed in case if the parsed data has nan
+        tab["min"] = tab["min"].astype(float)  # needed in case if the parsed data has nan
         tab["min"].unit = u.mag
         tab["f_min"] = [t["a"] for t in min_parsed]  # amplitude, Y or ""
         tab["u_min"] = [t["u"] for t in min_parsed]
@@ -340,9 +326,7 @@ class VSXInteractSkyCatalogProvider(InteractSkyCatalogProvider):
         return rs
 
     def get_proper_motion_correction_meta(self) -> ProperMotionCorrectionMeta:
-        return ProperMotionCorrectionMeta(
-            "RAJ2000", "DEJ2000", "pmRA", "pmDE", "icrs", self.J2000
-        )
+        return ProperMotionCorrectionMeta("RAJ2000", "DEJ2000", "pmRA", "pmDE", "icrs", self.J2000)
 
     def get_tooltips(self) -> list:
         return [
@@ -358,16 +342,12 @@ class VSXInteractSkyCatalogProvider(InteractSkyCatalogProvider):
         ]
 
     def get_detail_view(self, data: dict) -> Tuple[dict, list]:
-        vsx_url = (
-            f"https://www.aavso.org/vsx/index.php?view=detail.top&oid={data['OID']}"
-        )
+        vsx_url = f"https://www.aavso.org/vsx/index.php?view=detail.top&oid={data['OID']}"
         if np.isnan(data["Epoch"]):
             epoch_text = ""
         else:
             # iso date, e.g. 2019-07-31, followed by HJD
-            epoch_text = Time(data["Epoch"], format="jd", scale="utc").to_value(
-                "iso", subfmt="date"
-            )
+            epoch_text = Time(data["Epoch"], format="jd", scale="utc").to_value("iso", subfmt="date")
             epoch_text += f' (HJD {data["Epoch"]})'
         return {
             "Name": f"""{data['Name']} (<a href="{vsx_url}" target="_blank">VSX</a>)""",

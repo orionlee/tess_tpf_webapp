@@ -23,10 +23,7 @@ async def _do_download_tesscut(sr):
         tpf.hdu[0].header["OBJECT"] = f"TIC {tic}"
         tpf.meta = lk.targetpixelfile.HduToMetaMapping(tpf.hdu[0])
     except Exception as e:
-        warnings.warn(
-            "Unexpected error in extracting TIC from TessCut SearchResult. TIC will not be shown."
-            f" Error: {e}"
-        )
+        warnings.warn("Unexpected error in extracting TIC from TessCut SearchResult. TIC will not be shown." f" Error: {e}")
     return tpf
 
 
@@ -36,7 +33,7 @@ async def get_tpf(tic, sector, msg_label):
         if len(sr) > 1:
             # exclude fast cadence data (20s), TPFs with fast cadence always has 2 min cadence counterparts
             # for the use case here, the fast cadence data is irrelevant. It'd just make the processing slower.
-            sr = sr[sr.exptime > 60 *u.s]
+            sr = sr[sr.exptime > 60 * u.s]
         return sr
 
     def do_search_tesscut():
@@ -69,4 +66,4 @@ async def get_tpf(tic, sector, msg_label):
 
 
 def is_tesscut(tpf):
-    return "astrocut" == tpf.meta.get('CREATOR')
+    return "astrocut" == tpf.meta.get("CREATOR")

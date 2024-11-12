@@ -13,6 +13,7 @@ visualization widget showing the pixel data and a lightcurve::
 
 Note that this will only work inside a Jupyter notebook at this time.
 """
+
 from __future__ import division, print_function
 import os
 import logging
@@ -84,12 +85,17 @@ def _fill_masked_or_nan_with(ary, fill_value):
 
 def _correct_with_proper_motion(ra, dec, pm_ra, pm_dec, frame, equinox, new_time):
     """Return proper-motion corrected RA / Dec.
-       It also return whether proper motion correction is applied or not."""
+    It also return whether proper motion correction is applied or not."""
     # all parameters have units
 
-    if ra is None or dec is None or \
-       pm_ra is None or pm_dec is None or (np.all(pm_ra == 0) and np.all(pm_dec == 0)) or \
-       equinox is None:
+    if (
+        ra is None
+        or dec is None
+        or pm_ra is None
+        or pm_dec is None
+        or (np.all(pm_ra == 0) and np.all(pm_dec == 0))
+        or equinox is None
+    ):
         return ra, dec, False
 
     # handle cases pm_ra, pm_dec has some nan or masked value
@@ -107,8 +113,7 @@ def _correct_with_proper_motion(ra, dec, pm_ra, pm_dec, frame, equinox, new_time
     #    noticeable significant difference. E.g., applying it to Proxima Cen, a target with large parallax
     #    and huge proper motion, does not change the result in any noticeable way.
     #
-    c = SkyCoord(ra, dec, pm_ra_cosdec=pm_ra, pm_dec=pm_dec,
-                 frame=frame, obstime=equinox)
+    c = SkyCoord(ra, dec, pm_ra_cosdec=pm_ra, pm_dec=pm_dec, frame=frame, obstime=equinox)
 
     with warnings.catch_warnings():
         # Suppress ErfaWarning temporarily as a workaround for:
@@ -128,7 +133,7 @@ def _correct_with_proper_motion(ra, dec, pm_ra, pm_dec, frame, equinox, new_time
 
 def _get_corrected_coordinate(tpf_or_lc, as_skycoord=False):
     """Extract coordinate from Kepler/TESS FITS, with proper motion corrected
-       to the start of observation if proper motion is available."""
+    to the start of observation if proper motion is available."""
     h = tpf_or_lc.meta
     new_time = tpf_or_lc.time[0]
 
@@ -142,7 +147,7 @@ def _get_corrected_coordinate(tpf_or_lc, as_skycoord=False):
     if ra is None or dec is None or pm_ra is None or pm_dec is None or equinox is None:
         # case cannot apply proper motion due to missing parameters
         if as_skycoord:
-            return SkyCoord(ra * u.deg, dec * u.deg, frame='icrs')
+            return SkyCoord(ra * u.deg, dec * u.deg, frame="icrs")
         else:
             return ra, dec, False
 
@@ -153,20 +158,21 @@ def _get_corrected_coordinate(tpf_or_lc, as_skycoord=False):
         pm_unit = u.arcsecond / u.year
 
     ra_corrected, dec_corrected, pm_corrected = _correct_with_proper_motion(
-            ra * u.deg, dec * u.deg,
-            pm_ra * pm_unit, pm_dec * pm_unit,
-            "icrs",
-            # we assume the data is in J2000 epoch
-            Time(2000.0, format="jyear"),
-            new_time)
+        ra * u.deg,
+        dec * u.deg,
+        pm_ra * pm_unit,
+        pm_dec * pm_unit,
+        "icrs",
+        # we assume the data is in J2000 epoch
+        Time(2000.0, format="jyear"),
+        new_time,
+    )
     if as_skycoord:
         return SkyCoord(
-            ra_corrected, dec_corrected,
-            pm_ra_cosdec=pm_ra * pm_unit, pm_dec=pm_dec * pm_unit,
-            frame='icrs',
-            obstime=new_time)
+            ra_corrected, dec_corrected, pm_ra_cosdec=pm_ra * pm_unit, pm_dec=pm_dec * pm_unit, frame="icrs", obstime=new_time
+        )
     else:
-        return ra_corrected.to(u.deg).value,  dec_corrected.to(u.deg).value, pm_corrected
+        return ra_corrected.to(u.deg).value, dec_corrected.to(u.deg).value, pm_corrected
 
 
 def _to_unitless(items):
@@ -436,10 +442,14 @@ def add_target_figure_elements(tpf, fig):
         target_x, target_y = tpf.column + pix_x, tpf.row + pix_y
         fig.scatter(marker="cross", x=target_x, y=target_y, size=20, color="black", line_width=1)
         if not pm_corrected:
-            warnings.warn(("Proper motion correction cannot be applied to the target, as none is available. "
-                           "Thus the target (the cross) might be noticeably away from its observed position, "
-                           "if it has large proper motion."),
-                           category=LightkurveWarning)
+            warnings.warn(
+                (
+                    "Proper motion correction cannot be applied to the target, as none is available. "
+                    "Thus the target (the cross) might be noticeably away from its observed position, "
+                    "if it has large proper motion."
+                ),
+                category=LightkurveWarning,
+            )
 
 
 def create_provider(provider_class, tpf, magnitude_limit, extra_kwargs=None):
@@ -452,8 +462,10 @@ def create_provider(provider_class, tpf, magnitude_limit, extra_kwargs=None):
     try:
         c1 = _get_corrected_coordinate(tpf, as_skycoord=True)
     except Exception as err:
-        msg = ("Cannot get nearby stars because TargetPixelFile has no valid coordinate. "
-               f"ra: {getattr(tpf, 'ra', None)}, dec: {getattr(tpf, 'dec', None)}")
+        msg = (
+            "Cannot get nearby stars because TargetPixelFile has no valid coordinate. "
+            f"ra: {getattr(tpf, 'ra', None)}, dec: {getattr(tpf, 'dec', None)}"
+        )
         raise LightkurveError(msg) from err
 
     provider_kwargs["coord"] = c1
@@ -470,8 +482,7 @@ def create_provider(provider_class, tpf, magnitude_limit, extra_kwargs=None):
             pix_scale = 21.0
         else:
             raise ValueError(
-                f"The Target Pixel File is from an unsupported mission {tpf.mission}, "
-                "with unknown pixel scale."
+                f"The Target Pixel File is from an unsupported mission {tpf.mission}, " "with unknown pixel scale."
             )
         # We are querying with a diameter as the radius, overfilling by 2x.
         provider_kwargs["radius"] = Angle(np.max(tpf.shape[1:]) * pix_scale, "arcsec")
@@ -497,11 +508,14 @@ def add_catalog_figure_elements(provider, result, tpf, fig, message_selected_tar
     m = provider.get_proper_motion_correction_meta()
     if m is not None:
         ra_corrected, dec_corrected, _ = _correct_with_proper_motion(
-            result[m.ra_colname].quantity, result[m.dec_colname].quantity,
-            result[m.pmra_colname].quantity, result[m.pmdec_colname].quantity,
+            result[m.ra_colname].quantity,
+            result[m.dec_colname].quantity,
+            result[m.pmra_colname].quantity,
+            result[m.pmdec_colname].quantity,
             m.frame,
             m.equinox,
-            tpf.time[0])
+            tpf.time[0],
+        )
         result["RA"] = ra_corrected.to(u.deg).value
         result["RA"].unit = u.deg
         result["DEC"] = dec_corrected.to(u.deg).value
@@ -553,13 +567,7 @@ def add_catalog_figure_elements(provider, result, tpf, fig, message_selected_tar
     #
 
     # 1. plot the data, along with a hover pop-in
-    r = fig.scatter(
-        "x",
-        "y",
-        source=source,
-        size="size",
-        **provider.scatter_kwargs
-    )
+    r = fig.scatter("x", "y", source=source, size="size", **provider.scatter_kwargs)
 
     fig.add_tools(
         HoverTool(
@@ -673,9 +681,8 @@ async def async_parse_and_add_catalogs_figure_elements(
                 provider_class, extra_kwargs = catalog_spec[0], None
             else:
                 raise ValueError(
-                    "A catalog should be the catalog, or a tuple of catalog and keyword arguments. "
-                    f"Actual: {catalog_spec}"
-                    )
+                    "A catalog should be the catalog, or a tuple of catalog and keyword arguments. " f"Actual: {catalog_spec}"
+                )
         else:
             provider_class, extra_kwargs = catalog_spec, None
 
@@ -705,9 +712,11 @@ async def async_parse_and_add_catalogs_figure_elements(
             # format_exception() signature change in Python 3.10
             err_str = f"{type(err).__name__}: {err}\n" + "".join(traceback.format_exc())
             warnings.warn(
-                (f"Error while getting data from {provider.label}. Its data will not be in the plot. "
-                 f"The error: {err_str}"),
-                LightkurveWarning
+                (
+                    f"Error while getting data from {provider.label}. Its data will not be in the plot. "
+                    f"The error: {err_str}"
+                ),
+                LightkurveWarning,
             )
         results.append(result)
 
@@ -720,9 +729,11 @@ async def async_parse_and_add_catalogs_figure_elements(
             renderer = fig_tpf.scatter()  # a dummy renderer
             err_str = f"{type(err).__name__}:  {err}\n" + "".join(traceback.format_exc())
             warnings.warn(
-                (f"Error while rendering data from {provider.label}. Its data will not be in the plot. "
-                 f"The error: {err_str}"),
-                LightkurveWarning
+                (
+                    f"Error while rendering data from {provider.label}. Its data will not be in the plot. "
+                    f"The error: {err_str}"
+                ),
+                LightkurveWarning,
             )
 
         catalog_renderers.append(renderer)
@@ -733,10 +744,12 @@ def to_selected_pixels_source(tpf_source):
     xx = tpf_source.data["xx"].flatten()
     yy = tpf_source.data["yy"].flatten()
     selected_indices = tpf_source.selected.indices
-    return ColumnDataSource(dict(
-        xx=xx[selected_indices],
-        yy=yy[selected_indices],
-    ))
+    return ColumnDataSource(
+        dict(
+            xx=xx[selected_indices],
+            yy=yy[selected_indices],
+        )
+    )
 
 
 def make_tpf_figure_elements(
@@ -880,7 +893,7 @@ def make_tpf_figure_elements(
                 fill_color="gray",
                 fill_alpha=0.4,
                 line_color="white",
-                )
+            )
         else:
             # Paint the selected pixels such that they cannot be selected / deselected.
             # Used to show specified aperture pixels without letting users to
@@ -895,7 +908,7 @@ def make_tpf_figure_elements(
                 fill_color="gray",
                 fill_alpha=0.0,
                 line_color="white",
-                )
+            )
             r_selected.nonselection_glyph = None
 
     # Configure the stretch slider and its callback function
@@ -1041,9 +1054,7 @@ def show_interact_widget(
 
     aperture_mask = tpf._parse_aperture_mask(aperture_mask)
     if ~aperture_mask.any():
-        log.error(
-            "No pixels in `aperture_mask`, finding optimum aperture using `tpf.create_threshold_mask`."
-        )
+        log.error("No pixels in `aperture_mask`, finding optimum aperture using `tpf.create_threshold_mask`.")
         aperture_mask = tpf.create_threshold_mask()
     if ~aperture_mask.any():
         log.error("No pixels in `aperture_mask`, using all pixels.")
@@ -1100,9 +1111,7 @@ def show_interact_widget(
         tpf_source = prepare_tpf_datasource(tpf, aperture_mask)
 
         # Create the lightcurve figure and its vertical marker
-        fig_lc, vertical_line = make_lightcurve_figure_elements(
-            lc, lc_source, ylim_func=ylim_func
-        )
+        fig_lc, vertical_line = make_lightcurve_figure_elements(lc, lc_source, ylim_func=ylim_func)
 
         # Create the TPF figure and its stretch slider
         pedestal = -np.nanmin(tpf.flux.value) + 1
@@ -1134,15 +1143,11 @@ def show_interact_widget(
         )
         r_button = Button(label=">", button_type="default", width=30)
         l_button = Button(label="<", button_type="default", width=30)
-        export_button = Button(
-            label="Save Lightcurve", button_type="success", width=120
-        )
+        export_button = Button(label="Save Lightcurve", button_type="success", width=120)
         message_on_save = Div(text=" ", width=600, height=15)
 
         # Callbacks
-        def _create_lightcurve_from_pixels(
-            tpf, selected_pixel_indices, transform_func=transform_func
-        ):
+        def _create_lightcurve_from_pixels(tpf, selected_pixel_indices, transform_func=transform_func):
             """Create the lightcurve from the selected pixel index list"""
             selected_mask = aperture_mask_from_selected_indices(selected_pixel_indices, tpf)
             lc_new = tpf.to_lightcurve(aperture_mask=selected_mask)
@@ -1169,9 +1174,7 @@ def show_interact_widget(
                 tpf_source.selected.indices = new[1:]
 
             if new != []:
-                lc_new = _create_lightcurve_from_pixels(
-                    tpf, new, transform_func=transform_func
-                )
+                lc_new = _create_lightcurve_from_pixels(tpf, new, transform_func=transform_func)
                 lc_source.data["flux"] = lc_new.flux.value
 
                 if ylim_func is None:
@@ -1180,7 +1183,7 @@ def show_interact_widget(
                     ylims = _to_unitless(ylim_func(lc_new))
                 fig_lc.y_range.start = ylims[0]
                 fig_lc.y_range.end = ylims[1]
-                np.copyto(selected_mask_to_return,  lc_new.meta["APERTURE_MASK"])  # Update selected_mask_to_return
+                np.copyto(selected_mask_to_return, lc_new.meta["APERTURE_MASK"])  # Update selected_mask_to_return
             else:
                 lc_source.data["flux"] = lc.flux.value * 0.0
                 fig_lc.y_range.start = -1
@@ -1194,14 +1197,10 @@ def show_interact_widget(
             """Callback to take action when cadence slider changes"""
             if new in tpf.cadenceno:
                 frameno = tpf_index_lookup[new]
-                fig_tpf.select("tpfimg")[0].data_source.data["image"] = [
-                    tpf.flux.value[frameno, :, :] + pedestal
-                ]
+                fig_tpf.select("tpfimg")[0].data_source.data["image"] = [tpf.flux.value[frameno, :, :] + pedestal]
                 vertical_line.update(location=tpf.time.value[frameno])
             else:
-                fig_tpf.select("tpfimg")[0].data_source.data["image"] = [
-                    tpf.flux.value[0, :, :] * np.NaN
-                ]
+                fig_tpf.select("tpfimg")[0].data_source.data["image"] = [tpf.flux.value[0, :, :] * np.NaN]
             lc_source.selected.indices = []
 
         def go_right_by_one():
@@ -1219,9 +1218,7 @@ def show_interact_widget(
         def save_lightcurve():
             """Save the lightcurve as a fits file with mask as HDU extension"""
             if tpf_source.selected.indices != []:
-                lc_new = _create_lightcurve_from_pixels(
-                    tpf, tpf_source.selected.indices, transform_func=transform_func
-                )
+                lc_new = _create_lightcurve_from_pixels(tpf, tpf_source.selected.indices, transform_func=transform_func)
                 lc_new.to_fits(
                     exported_filename,
                     overwrite=True,
@@ -1239,9 +1236,7 @@ def show_interact_widget(
                     text = '<font color="gray"><i>Saved file {} </i></font>'
                     message_on_save.text = text.format(exported_filename)
             else:
-                text = (
-                    '<font color="gray"><i>No pixels selected, no mask saved</i></font>'
-                )
+                text = '<font color="gray"><i>No pixels selected, no mask saved</i></font>'
                 export_button.button_type = "warning"
                 message_on_save.text = text
 
@@ -1272,6 +1267,7 @@ def show_interact_widget(
         return widgets_and_figures
 
     if return_type is None:
+
         def create_interact_ui_at_doc(doc):
             doc.add_root(create_interact_ui())
 
@@ -1298,13 +1294,17 @@ def _create_select_catalog_ui(providers, catalog_renderers):
         labels=[p.label for p in providers],
         active=list(range(0, len(providers))),  # make all checked
         inline=True,
-        )
+    )
     # add more horizontal spacing between checkboxes
-    select_catalog_ui.stylesheets = [InlineStyleSheet(css="""\
+    select_catalog_ui.stylesheets = [
+        InlineStyleSheet(
+            css="""\
 .bk-input-group.bk-inline > label {
 margin: 5px 10px;
 }
-""")]
+"""
+        )
+    ]
 
     def select_catalog_handler(attr, old, new):
         # new is the list of indices of active (i.e., checked) catalogs
@@ -1329,8 +1329,13 @@ def make_interact_sky_selection_elements(fig_tpf):
     # an arrow that serves as the marker of the selected star.
     arrow_4_selected = Arrow(
         end=VeeHead(size=16, fill_color="red", line_color="black"),
-        line_color="red", line_width=4,
-        x_start=0, y_start=0, x_end=0, y_end=0, tags=["selected"],
+        line_color="red",
+        line_width=4,
+        x_start=0,
+        y_start=0,
+        x_end=0,
+        y_end=0,
+        tags=["selected"],
         visible=False,
     )
     fig_tpf.add_layout(arrow_4_selected)
@@ -1402,7 +1407,7 @@ def show_skyview_widget(tpf, notebook_url=None, aperture_mask="empty", catalogs=
             fiducial_frame=fiducial_frame,
             width=640,
             height=600,
-            tools="tap,box_zoom,wheel_zoom,reset"
+            tools="tap,box_zoom,wheel_zoom,reset",
         )
 
         # Add a marker (cross) to indicate the coordinate of the target
@@ -1412,20 +1417,16 @@ def show_skyview_widget(tpf, notebook_url=None, aperture_mask="empty", catalogs=
 
         providers, catalog_renderers = await async_parse_and_add_catalogs_figure_elements(
             catalogs, magnitude_limit, tpf, fig_tpf, message_selected_target, arrow_4_selected
-            )
+        )
 
         # Optionally override the default title
         if tpf.mission == "K2":
-            fig_tpf.title.text = (
-                "Skyview for EPIC {}, K2 Campaign {}, CCD {}.{}".format(
-                    tpf.targetid, tpf.campaign, tpf.module, tpf.output
-                )
+            fig_tpf.title.text = "Skyview for EPIC {}, K2 Campaign {}, CCD {}.{}".format(
+                tpf.targetid, tpf.campaign, tpf.module, tpf.output
             )
         elif tpf.mission == "Kepler":
-            fig_tpf.title.text = (
-                "Skyview for KIC {}, Kepler Quarter {}, CCD {}.{}".format(
-                    tpf.targetid, tpf.quarter, tpf.module, tpf.output
-                )
+            fig_tpf.title.text = "Skyview for KIC {}, Kepler Quarter {}, CCD {}.{}".format(
+                tpf.targetid, tpf.quarter, tpf.module, tpf.output
             )
         elif tpf.mission == "TESS":
             fig_tpf.title.text = "Skyview for TESS {} Sector {}, Camera {}.{}".format(
@@ -1444,7 +1445,7 @@ def show_skyview_widget(tpf, notebook_url=None, aperture_mask="empty", catalogs=
             select_catalog_ui = _create_select_catalog_ui(providers, catalog_renderers)
             widgets_and_figures = layout(
                 Row(
-                    Column(fig_tpf,  select_catalog_ui, stretch_slider),
+                    Column(fig_tpf, select_catalog_ui, stretch_slider),
                     message_selected_target,
                 )
             )
@@ -1456,6 +1457,7 @@ def show_skyview_widget(tpf, notebook_url=None, aperture_mask="empty", catalogs=
         #  as it has its own event loop.)
         async def do_create_ui():
             doc.add_root(await async_create_interact_ui())
+
         doc.add_next_tick_callback(do_create_ui)
 
     if return_type is None:

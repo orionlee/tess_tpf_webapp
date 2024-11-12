@@ -52,13 +52,9 @@ def _query_cone_region(coord, radius) -> Table:
     return tab
 
 
-def get_lightcurve(
-    asas_sn_id, use_native=False, shift_mag=True, good_quality_only=True
-):
+def get_lightcurve(asas_sn_id, use_native=False, shift_mag=True, good_quality_only=True):
     client = SkyPatrolClient(verbose=False)
-    lcc = client.query_list(
-        [asas_sn_id], catalog="stellar_main", id_col="asas_sn_id", download=True
-    )
+    lcc = client.query_list([asas_sn_id], catalog="stellar_main", id_col="asas_sn_id", download=True)
     if len(lcc) < 1:
         return None
 
@@ -86,9 +82,7 @@ def get_lightcurve(
         # specify the units, somehow doing it in `data` above does not work.
         lc[c] = lc[c] * u.mag
 
-    lc.meta.update(
-        {"TARGETID": asas_sn_id, "LABEL": f"ASAS-SN Sky Patrol {asas_sn_id}"}
-    )
+    lc.meta.update({"TARGETID": asas_sn_id, "LABEL": f"ASAS-SN Sky Patrol {asas_sn_id}"})
 
     if good_quality_only:
         lc = lc[lc["quality"] == "G"]
@@ -221,9 +215,7 @@ class SkyPatrol2InteractSkyCatalogProvider(InteractSkyCatalogProvider):
 
     def get_proper_motion_correction_meta(self) -> ProperMotionCorrectionMeta:
         # the ra / dec returned is from Gaia DR2, using J2015.5 epoch
-        return ProperMotionCorrectionMeta(
-            "ra_deg", "dec_deg", "pm_ra", "pm_dec", "icrs", self.J2015_5
-        )
+        return ProperMotionCorrectionMeta("ra_deg", "dec_deg", "pm_ra", "pm_dec", "icrs", self.J2015_5)
 
     def get_tooltips(self) -> list:
         return [
@@ -237,9 +229,7 @@ class SkyPatrol2InteractSkyCatalogProvider(InteractSkyCatalogProvider):
         ]
 
     def get_detail_view(self, data: dict) -> Tuple[dict, list]:
-        skypatrol2_site_url = (
-            f"http://asas-sn.ifa.hawaii.edu/skypatrol/objects/{data['asas_sn_id']}"
-        )
+        skypatrol2_site_url = f"http://asas-sn.ifa.hawaii.edu/skypatrol/objects/{data['asas_sn_id']}"
         return {
             "ASAS-SN ID": f"""{data['asas_sn_id']} (<a href="{skypatrol2_site_url}" target="_blank">SkyPatrol v2</a>)""",
             'Separation (")': f"{data['separation']:.2f}",
