@@ -864,12 +864,13 @@ def get_arg_as_float(args, arg_name, default_val=None):
 #
 # Entry Point logic
 #
-set_log_level_from_env()
-args = curdoc().session_context.request.arguments
-tic = get_arg_as_int(args, "tic", None)  # default value for sample
-sector = get_arg_as_int(args, "sector", None)
-magnitude_limit = get_arg_as_float(args, "magnitude_limit", None)
-log.debug(f"Parameters: , {tic}, {sector}, {magnitude_limit} ; {args}")
+if __name__.startswith("bokeh_app_"):  # invoked from `bokeh serve`
+    set_log_level_from_env()
+    args = curdoc().session_context.request.arguments
+    tic = get_arg_as_int(args, "tic", None)  # default value for sample
+    sector = get_arg_as_int(args, "sector", None)
+    magnitude_limit = get_arg_as_float(args, "magnitude_limit", None)
+    log.debug(f"Parameters: , {tic}, {sector}, {magnitude_limit} ; {args}")
 
-curdoc().title = "TESS Target Pixels Inspector"
-show_app(tic, sector, magnitude_limit)
+    curdoc().title = "TESS Target Pixels Inspector"
+    show_app(tic, sector, magnitude_limit)
