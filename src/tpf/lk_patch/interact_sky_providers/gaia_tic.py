@@ -118,6 +118,7 @@ class GaiaDR3InteractSkyCatalogProvider(VizierInteractSkyCatalogProvider):
         scatter_kwargs: dict = None,
         extra_cols_in_detail_view: dict = None,
         url_templates: dict = None,
+        gaiadr3_var_scatter_marker: str = "triangle",
     ) -> None:
         if scatter_kwargs is None:
             scatter_kwargs = dict(
@@ -169,6 +170,10 @@ class GaiaDR3InteractSkyCatalogProvider(VizierInteractSkyCatalogProvider):
         if url_templates is not None:
             self.url_templates.update(url_templates)
 
+        # Use a different marker for Gaia DR3 Variable
+        # set to None to use the default marker
+        self.gaiadr3_var_scatter_marker = gaiadr3_var_scatter_marker
+
     @property
     def label(self) -> str:
         return "Gaia DR3"
@@ -207,6 +212,11 @@ class GaiaDR3InteractSkyCatalogProvider(VizierInteractSkyCatalogProvider):
     def add_to_data_source(self, result: Table, source: dict) -> None:
         super().add_to_data_source(result, source)
         source["one_over_plx"] = 1.0 / (result["Plx"] / 1000.0)
+        if self.gaiadr3_var_scatter_marker is not None:
+            m_default = self.scatter_kwargs["marker"]
+            m_var = self.gaiadr3_var_scatter_marker
+            source["marker"] = [m_var if v == "VARIABLE" else m_default for v in result["VarFlag"]]
+            self.scatter_kwargs["marker"] = "marker"  # refers to the marker column in the source
 
     def get_tooltips(self) -> list:
         return [
