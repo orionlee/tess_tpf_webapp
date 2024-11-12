@@ -1,0 +1,33 @@
+[tool.poetry]
+name = "tess_tpf_webapp"
+version = "0.1.0"
+description = "TESS Target Pixels Inspector Web Application"
+package-mode = false
+license = "MIT"
+authors = ["Sam Lee"]
+readme = "README.md"
+repository = "https://github.com/orionlee/tess_tpf_webapp/"
+keywords = ["NASA", "TESS", "Astronomy", "Lightcurve"]
+# Indicate to poetry that this is not a python package
+#  https://github.com/python-poetry/poetry/issues/1148#issuecomment-501462169
+classifiers = [
+  "Private :: Do Not Upload",
+]
+
+
+[tool.poetry.dependencies]
+python = "^3.10.0"
+lightkurve = "^2.5.0"
+skypatrol = "^0.6.16"
+
+
+[tool.poetry.dev-dependencies]
+black = ">=22.3.0"
+flake8 = ">=4.0.1"
+
+[tool.black]
+line-length = 127
+target-version = ['py310']
+extend-exclude = '''
+^/.vscode/
+'''
