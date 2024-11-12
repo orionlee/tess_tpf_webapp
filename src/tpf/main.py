@@ -714,7 +714,10 @@ async def create_app_body_ui(tic, sector, magnitude_limit=None):
 
     # set at info level, as it might be useful to gather statistics on the type of tpfs being plotted ()
     log.info(f"Plot Skyview: {tpf}, sector={tpf.meta.get('SECTOR')}, exptime={sr.exptime[-1]}, TessCut={is_tesscut(tpf)}")
+    return await create_app_body_ui_from_tpf(tpf, magnitude_limit=magnitude_limit)
 
+
+async def create_app_body_ui_from_tpf(tpf, magnitude_limit=None):
     if magnitude_limit is None:
         # supply default
         magnitude_limit = tpf.meta.get("TESSMAG", 0)
