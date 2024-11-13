@@ -29,6 +29,24 @@ async def _do_download_tesscut(sr):
 
 
 async def get_tpf(tic, sector, msg_label):
+    # suppress the unnecessary logging error messages "No data found for target ..." from search
+    # they just pollute the log output in an webapp environment
+    search_log = lk.search.log
+    error_original = search_log.error
+
+    def error_ignore_no_data(msg, *args, **kwargs):
+        if str(msg).startswith("No data found for target "):
+            return
+        error_original(msg, *args, **kwargs)
+
+    search_log.error = error_ignore_no_data
+    try:
+        return await _do_get_tpf(tic, sector, msg_label)
+    finally:
+        search_log.error = error_original
+
+
+async def _do_get_tpf(tic, sector, msg_label):
     def do_search_tpf():
         sr = lk.search_targetpixelfile(f"TIC{tic}", mission="TESS", sector=sector)
         if len(sr) > 1:
