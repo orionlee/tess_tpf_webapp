@@ -391,6 +391,7 @@ class GaiaDR3TICInteractSkyCatalogProvider(GaiaDR3InteractSkyCatalogProvider):
         scatter_kwargs: dict = None,
         extra_cols_in_detail_view: dict = None,
         url_templates: dict = None,
+        gaiadr3_var_scatter_marker: str = "triangle",
     ) -> None:
         super().__init__(
             coord,
@@ -399,6 +400,7 @@ class GaiaDR3TICInteractSkyCatalogProvider(GaiaDR3InteractSkyCatalogProvider):
             scatter_kwargs,
             extra_cols_in_detail_view,
             url_templates,
+            gaiadr3_var_scatter_marker,
         )
         # TIC-specific
         self.cols_for_source += ["TIC", "Tmag"]
