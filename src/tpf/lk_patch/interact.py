@@ -61,6 +61,7 @@ try:
     from bokeh.models.tools import HoverTool
     from bokeh.models.widgets import Button, Div, CheckboxGroup
     from bokeh.models.formatters import PrintfTickFormatter
+    from bokeh.events import Reset
 except Exception as e:
     # We will print a nice error message in the `show_interact_widget` function
     # the error would be raised there in case users need to diagnose problems
@@ -1111,6 +1112,8 @@ def show_interact_widget(
         # The data source includes metadata for hover-over tooltips
         lc_source = prepare_lightcurve_datasource(lc)
         tpf_source = prepare_tpf_datasource(tpf, aperture_mask)
+        # remember the initial pixel selection (to be used in reset)
+        initial_tpf_selected_indices = tpf_source.selected.indices
 
         # Create the lightcurve figure and its vertical marker
         fig_lc, vertical_line = make_lightcurve_figure_elements(lc, lc_source, ylim_func=ylim_func)
@@ -1246,11 +1249,17 @@ def show_interact_widget(
             if new != []:
                 cadence_slider.value = lc.cadenceno[new[0]]
 
+        def do_on_reset_tpf(event):
+            # instead of the default clearing out pixel selection,
+            # return to the initial pixel selection, matching what the users initially saw.
+            tpf_source.selected.indices = initial_tpf_selected_indices
+
         # Map changes to callbacks
         r_button.on_click(go_right_by_one)
         l_button.on_click(go_left_by_one)
         tpf_source.selected.on_change("indices", update_upon_pixel_selection)
         lc_source.selected.on_change("indices", jump_to_lightcurve_position)
+        fig_tpf.on_event(Reset, do_on_reset_tpf)
         export_button.on_click(save_lightcurve)
         cadence_slider.on_change("value", update_upon_cadence_change)
 
