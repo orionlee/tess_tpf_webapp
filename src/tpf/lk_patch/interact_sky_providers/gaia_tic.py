@@ -392,6 +392,7 @@ class GaiaDR3TICInteractSkyCatalogProvider(GaiaDR3InteractSkyCatalogProvider):
         extra_cols_in_detail_view: dict = None,
         url_templates: dict = None,
         gaiadr3_var_scatter_marker: str = "triangle",
+        target_tic: int = None,
     ) -> None:
         super().__init__(
             coord,
@@ -407,6 +408,9 @@ class GaiaDR3TICInteractSkyCatalogProvider(GaiaDR3InteractSkyCatalogProvider):
         self.tic_catalog_name = "IV/39/tic82"
         self.exclude_tic_duplicates = True
         self.exclude_tic_artifacts = True
+        self.target_tic = target_tic  # if not None, compute delta Tmag as well
+        if self.to_include_delta_tmag():
+            self.cols_for_source += ["Delta_Tmag"]
 
     @property
     def label(self) -> str:
@@ -509,14 +513,34 @@ class GaiaDR3TICInteractSkyCatalogProvider(GaiaDR3InteractSkyCatalogProvider):
             rs[c] = rs[c].astype(str).filled("")
             rs[c].format = None
 
+        self._add_delta_tmag(rs)
+
         return rs
+
+    def _add_delta_tmag(self, rs: Table):
+        if not self.to_include_delta_tmag():
+            return
+
+        target_row = rs[rs["TIC"] == str(self.target_tic)]
+        if len(target_row) < 1:
+            return
+        else:
+            target_row = target_row[0]
+
+        target_tmag = target_row["Tmag"]
+
+        rs["Delta_Tmag"] = rs["Tmag"] - target_tmag
 
     def get_tooltips(self) -> list:
         tooltips = super().get_tooltips()
-        return [
+        extras = [
             ("TIC", "@TIC"),
             ("Tmag", "@Tmag"),
-        ] + tooltips
+        ]
+        # include Delta Tmag in tooltip might make it too busy, skip it for now
+        # if self.to_include_delta_tmag():
+        #     extras.append(("ΔTmag", "@Delta_Tmag"))
+        return extras + tooltips
 
     def get_detail_view(self, data: dict) -> Tuple[dict, list]:
         gaia_key_vals, gaia_extra_rows = super().get_detail_view(data)
@@ -529,9 +553,20 @@ class GaiaDR3TICInteractSkyCatalogProvider(GaiaDR3InteractSkyCatalogProvider):
 
         key_vals = {
             "TIC": tic_val_html,
-            "Tmag": f"{data['Tmag']:.3f}",
         }
+
+        if np.isfinite(data["Tmag"]):
+            key_vals["Tmag"] = f"{data['Tmag']:.3f}"
+
+        if self.to_include_delta_tmag():
+            if (np.isfinite(data["Delta_Tmag"])) and data["TIC"] != str(self.target_tic):
+                key_vals["ΔTmag"] = f"{data['Delta_Tmag']:.3f}"
+            # else: skip delta,  if delta is nan, or if the selected object is the target itself
+
         # append Gaia's key-value pairs so they appear after TICs
         key_vals.update(gaia_key_vals)
 
         return key_vals, gaia_extra_rows
+
+    def to_include_delta_tmag(self):
+        return self.target_tic is not None
