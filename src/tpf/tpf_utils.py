@@ -2,6 +2,7 @@ import logging
 import warnings
 
 import astropy.units as u
+import numpy as np
 
 import lightkurve as lk
 from .lk_patch.interact import _create_background_task
@@ -67,3 +68,28 @@ async def get_tpf(tic, sector, msg_label):
 
 def is_tesscut(tpf):
     return "astrocut" == tpf.meta.get("CREATOR")
+
+
+def cutout_by_range(tpf, aperture_mask, col_range, row_range):
+    img_shape = tpf.flux[0].shape
+
+    # handle cases the given range is outside the TPF (zoomed out)
+    col_start = col_range[0] if col_range[0] >= 0 else 0
+    col_end = col_range[1] if col_range[1] <= img_shape[1] else img_shape[1]
+    row_start = row_range[0] if row_range[0] >= 0 else 0
+    row_end = row_range[1] if row_range[1] <= img_shape[0] else img_shape[0]
+    col_range, row_range = (col_start, col_end), (row_start, row_end)
+
+    center = (
+        np.ceil((col_range[1] - col_range[0]) / 2) + col_range[0],
+        np.ceil((row_range[1] - row_range[0]) / 2) + row_range[0],
+    )
+    size = (col_range[1] - col_range[0], row_range[1] - row_range[0])
+    if col_range[0] == 0 and row_range[0] == 0 and size == (img_shape[1], img_shape[0]):
+        return tpf, aperture_mask  # no cutout is needed (full range)
+    # else cutout is needed
+    tpf_cut = tpf.cutout(center=center, size=size)
+    aperture_mask_cut = aperture_mask[
+        row_range[0] : row_range[1], col_range[0] : col_range[1]  # noqa: E203 (use black format for :)
+    ]
+    return tpf_cut, aperture_mask_cut

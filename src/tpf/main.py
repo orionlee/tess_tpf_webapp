@@ -18,7 +18,7 @@ from .lk_patch.interact import (
     _get_corrected_coordinate,
 )
 from .ext_gaia_tic import ExtendedGaiaDR3TICInteractSkyCatalogProvider
-from .tpf_utils import get_tpf, is_tesscut
+from .tpf_utils import get_tpf, is_tesscut, cutout_by_range
 from .lc_utils import read_lc, guess_lc_source
 
 import bokeh
@@ -499,6 +499,7 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
         def plot_per_pixels():
             import matplotlib.pyplot as plt
 
+            # cut tpf to the time range in `interact` figure
             xstart, xend = fig_lc.x_range.start, fig_lc.x_range.end
             log.info(
                 f"Plot per pixels: {tpf}, sector={tpf.meta.get('SECTOR')}, TessCut={is_tesscut(tpf)}"
@@ -508,6 +509,12 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
             tpf_trunc = tpf
             tpf_trunc = tpf_trunc[tpf_trunc.time.value >= xstart]
             tpf_trunc = tpf_trunc[tpf_trunc.time.value <= xend]
+
+            # cut tpf to the pixel range (columns/rows) in `interact` figure
+            fig_tpf = ui_body.select_one({"name": "fig_tpf"})
+            row_range = round(fig_tpf.y_range.start - (tpf.row - 0.5)), round(fig_tpf.y_range.end - (tpf.row - 0.5))
+            col_range = round(fig_tpf.x_range.start - (tpf.column - 0.5)), round(fig_tpf.x_range.end - (tpf.column - 0.5))
+            tpf_trunc, aperture_mask_trunc = cutout_by_range(tpf_trunc, interact_mask.copy(), col_range, row_range)
 
             @cache
             def get_bkg_per_pixel_lc_trunc():
@@ -520,6 +527,9 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
                     return lc
 
             pixel_size_inches = 0.6
+            if tpf_trunc.flux[0].shape[0] < 7 or tpf_trunc.flux[0].shape[1] < 7:
+                # make each pixel larger if the cutout is large
+                pixel_size_inches = 1.5
 
             # scale marker size based on time range
             # (a proxy of number of dots to show)
@@ -536,7 +546,7 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
             fig = plt.figure(figsize=(shape[1] * pixel_size_inches, shape[0] * pixel_size_inches))
             ax = tpf_trunc.plot_pixels(
                 ax=fig.gca(),
-                aperture_mask=interact_mask,
+                aperture_mask=aperture_mask_trunc,
                 corrector_func=corrector_func,
                 show_flux=True,
                 markersize=markersize,
