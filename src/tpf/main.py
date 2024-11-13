@@ -749,8 +749,8 @@ async def create_app_body_ui_from_tpf(tpf, magnitude_limit=None, catalogs=None):
     # as it's often not representative
     # (due to scatter light at the beginning of a sector)
     # Show brightness around day 3 (arbitrarily) instead.
-    if tpf.time.max() - tpf.time.min() > 3:
-        tpf = tpf[tpf.time.value > tpf.time.min().value + 3]
+    if tpf.time.max() - tpf.time.min() > 3 * u.day:
+        tpf = tpf[tpf.time > tpf.time.min() + 3 * u.day]
 
     # a catalog can be disabled by excluding it in the catalogs param
     # OPEN: consider to make the default configurable from an environment variable
