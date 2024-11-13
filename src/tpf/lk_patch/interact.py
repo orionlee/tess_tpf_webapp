@@ -1200,7 +1200,7 @@ def show_interact_widget(
                 fig_tpf.select("tpfimg")[0].data_source.data["image"] = [tpf.flux.value[frameno, :, :] + pedestal]
                 vertical_line.update(location=tpf.time.value[frameno])
             else:
-                fig_tpf.select("tpfimg")[0].data_source.data["image"] = [tpf.flux.value[0, :, :] * np.NaN]
+                fig_tpf.select("tpfimg")[0].data_source.data["image"] = [tpf.flux.value[0, :, :] * np.nan]
             lc_source.selected.indices = []
 
         def go_right_by_one():
