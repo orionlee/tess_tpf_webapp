@@ -765,6 +765,7 @@ def make_tpf_figure_elements(
     vmax=None,
     cmap="Viridis256",
     tools="tap,box_select,wheel_zoom,reset",
+    fig_name="fig_tpf",
 ):
     """Returns the lightcurve figure elements.
 
@@ -821,6 +822,7 @@ def make_tpf_figure_elements(
         tools=tools,
         toolbar_location="below",
         border_fill_color="whitesmoke",
+        name=fig_name,
     )
 
     fig.yaxis.axis_label = "Pixel Row Number"
