@@ -750,7 +750,9 @@ async def create_app_body_ui_from_tpf(tpf, magnitude_limit=None, catalogs=None):
     # (due to scatter light at the beginning of a sector)
     # Show brightness around day 3 (arbitrarily) instead.
     if tpf.time.max() - tpf.time.min() > 3 * u.day:
-        tpf = tpf[tpf.time > tpf.time.min() + 3 * u.day]
+        tpf_skyview = tpf[tpf.time > tpf.time.min() + 3 * u.day]
+    else:
+        tpf_skyview = tpf
 
     # a catalog can be disabled by excluding it in the catalogs param
     # OPEN: consider to make the default configurable from an environment variable
@@ -798,7 +800,7 @@ async def create_app_body_ui_from_tpf(tpf, magnitude_limit=None, catalogs=None):
         warnings.filterwarnings("ignore", message="Proper motion correction cannot", category=lk.LightkurveWarning)
 
         create_skyview_ui = show_skyview_widget(
-            tpf,
+            tpf_skyview,
             aperture_mask=tpf.pipeline_mask,
             magnitude_limit=magnitude_limit,
             catalogs=catalogs_with_params,
