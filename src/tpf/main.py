@@ -15,10 +15,9 @@ from .lk_patch.interact import (
     prepare_lightcurve_datasource,
     make_lightcurve_figure_elements,
     show_interact_widget,
-    _get_corrected_coordinate,
 )
 from .ext_gaia_tic import ExtendedGaiaDR3TICInteractSkyCatalogProvider
-from .tpf_utils import get_tpf, is_tesscut, cutout_by_range
+from .tpf_utils import get_tpf, is_tesscut, cutout_by_range, create_mask_for_target, create_background_per_pixel_lc
 from .lc_utils import read_lc, guess_lc_source
 
 import bokeh
@@ -371,7 +370,7 @@ def export_plt_fig_as_data_uri(fig, close_fig=True):
     return uri
 
 
-def create_tpf_interact_ui(tpf):
+def create_tpf_interact_ui(tpf, hide_save_to_local_btn=True):
     btn_inspect = Button(label="Inspect", button_type="primary")
     btn_help_inspect = HelpButton(
         tooltip=Tooltip(
@@ -425,12 +424,7 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
         @cache
         def get_bkg_per_pixel_lc():
             """Helper for a rough background subtraction, used in TessCut TPFs."""
-            # based on:
-            # https://github.com/lightkurve/lightkurve/blob/main/docs/source/tutorials/2-creating-light-curves/2-1-cutting-out-tpfs.ipynb
-            background_mask = ~tpf.create_threshold_mask(threshold=0.001, reference_pixel=None)
-            n_background_pixels = background_mask.sum()  # TODO: handle edge case 0 pixels are picked
-            background_lc_per_pixel = tpf.to_lightcurve(aperture_mask=background_mask) / n_background_pixels
-            return background_lc_per_pixel
+            return create_background_per_pixel_lc(tpf)
 
         # flux: either normalized or raw e-/s
         def transform_func(lc):
@@ -444,20 +438,10 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
             ymax = get_value_in_float(in_ymax, np.nanmax(lc.flux).value)
             return (ymin * unit, ymax * unit)
 
-        def create_mask_for_target_pixel():
-            t_ra, t_dec, _ = _get_corrected_coordinate(tpf)
-            pix_x, pix_y = tpf.wcs.all_world2pix([(t_ra, t_dec)], 0)[0]
-            # + 0.5: the pixel coordinate refers to the center of the pixel
-            #        e.g., for y=2.7, visually it's on y=3, as y=2 really covers [1.5, 2.5]
-            x, y = int(pix_x + 0.5), int(pix_y + 0.5)
-            mask = np.full(tpf.flux[0].shape, False)
-            mask[y][x] = True
-            return mask
-
         # for TessCut, set the initial aperture mask to be the single pixel where the target is located
         # the behavior would be more consistent than using the threshold mask,
         # which might not be referring to the target at all.
-        aperture_mask = create_mask_for_target_pixel() if is_tesscut(tpf) else tpf.pipeline_mask
+        aperture_mask = create_mask_for_target(tpf) if is_tesscut(tpf) else tpf.pipeline_mask
 
         # ^^^ for transform_func() and ylim_func()
         #     read users input during execution (inside function body)
@@ -486,9 +470,11 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
             warnings.warn(f"Failed to enable box zoom as default for tpf.interact() LC viewer. {e}")
 
         # hide "Save lightcurve" button (not applicable in Web UI)
-        btn_save_lc = ui_body.select_one({"label": "Save Lightcurve"})
-        if btn_save_lc is not None:
-            btn_save_lc.visible = False
+        # OPEN: we might present a new button to let users download the LC from the webapp
+        if hide_save_to_local_btn:
+            btn_save_lc = ui_body.select_one({"label": "Save Lightcurve"})
+            if btn_save_lc is not None:
+                btn_save_lc.visible = False
 
         # add UI and functions for per-pixel plot
         btn_plot_per_pixels = Button(label="Per-Pixel Plot", button_type="success")  # "success" to signify secondary

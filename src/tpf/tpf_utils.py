@@ -5,7 +5,7 @@ import astropy.units as u
 import numpy as np
 
 import lightkurve as lk
-from .lk_patch.interact import _create_background_task
+from .lk_patch.interact import _get_corrected_coordinate, _create_background_task
 
 log = logging.getLogger(__name__)
 
@@ -111,3 +111,71 @@ def cutout_by_range(tpf, aperture_mask, col_range, row_range):
         row_range[0] : row_range[1], col_range[0] : col_range[1]  # noqa: E203 (use black format for :)
     ]
     return tpf_cut, aperture_mask_cut
+
+
+def create_mask_for_target(tpf, mask_shape="1pixel"):
+    """Create a mask of the pixel the target is located.
+    A 1-pixel mask is returned by default.
+    """
+    t_ra, t_dec, _ = _get_corrected_coordinate(tpf)
+    pix_x, pix_y = tpf.wcs.all_world2pix([(t_ra, t_dec)], 0)[0]
+    # + 0.5: the pixel coordinate refers to the center of the pixel
+    #        e.g., for y=2.7, visually it's on y=3, as y=2 really covers [1.5, 2.5]
+    xx, yy = int(pix_x + 0.5), int(pix_y + 0.5)
+    data = tpf.flux[0]
+    mask = np.full(data.shape, False)
+    if mask_shape == "1pixel":
+        mask[yy][xx] = True
+    elif mask_shape == "3x3":
+        # Make sure the 3x3 patch does not leave the TPF bounds
+        # based on lightkurve.utils.centroid_quadratic()
+        # https://github.com/lightkurve/lightkurve/blob/main/src/lightkurve/utils.py
+        if yy < 1:
+            yy = 1
+        if xx < 1:
+            xx = 1
+        if yy > (data.shape[0] - 2):
+            yy = data.shape[0] - 2
+        if xx > (data.shape[1] - 2):
+            xx = data.shape[1] - 2
+
+        mask[yy - 1 : yy + 2, xx - 1 : xx + 2] = True  # noqa: E203
+    else:
+        raise ValueError(f"Unsupported mask_shape parameter value: '{mask_shape}'")
+    return mask
+
+
+def create_background_mask_by_threshold(tpf, exclude_target_pixels=True):
+    """Create a rough background mask."""
+    # based on:
+    # https://github.com/lightkurve/lightkurve/blob/main/docs/source/tutorials/2-creating-light-curves/2-1-cutting-out-tpfs.ipynb
+    background_mask_initial = ~tpf.create_threshold_mask(threshold=0.001, reference_pixel=None)
+    if not exclude_target_pixels:
+        return background_mask_initial
+
+    target_mask = create_mask_for_target(tpf, mask_shape="3x3")
+    background_mask = background_mask_initial & ~target_mask
+    if background_mask.sum() < 1:
+        background_mask = background_mask_initial
+        warnings.warn(
+            "0 pixel in background mask after excluding those around the target. "
+            f"Revert to the background mask without the exclusion, with {background_mask.sum()} pixels."
+        )
+    return background_mask
+
+
+def create_background_per_pixel_lc(tpf, exclude_target_pixels=True):
+    """Helper for a rough background subtraction, used in TessCut TPFs."""
+    # based on:
+    # https://github.com/lightkurve/lightkurve/blob/main/docs/source/tutorials/2-creating-light-curves/2-1-cutting-out-tpfs.ipynb
+    background_mask = create_background_mask_by_threshold(tpf, exclude_target_pixels=exclude_target_pixels)
+    n_background_pixels = background_mask.sum()
+    background_lc_per_pixel = tpf.to_lightcurve(aperture_mask=background_mask) / n_background_pixels
+    return background_lc_per_pixel
+
+
+def subtract_background(lc, tpf):
+    """Subtract a (rough) background from the lightcurve, used in TessCut TPFs.
+    The rough background is created from `create_background_per_pixel_lc()`
+    """
+    return lc - create_background_per_pixel_lc(tpf) * lc.meta["APERTURE_MASK"].sum()
