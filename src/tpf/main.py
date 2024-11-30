@@ -326,8 +326,13 @@ def create_skyview_metadata_ui(tpf, ztf_search_radius, ztf_ngoodobsrel_min, skyp
         unreliable_pixels_warn_msg = """
 <span style="background-color: yellow; padding-left: 4px; padding-right: 4px;">Warning:</span>
 Some of the pixels are not science pixels.
-See <a href="https://archive.stsci.edu/missions/tess/doc/TESS_Instrument_Handbook_v0.1.pdf">TESS Instrument Handbook</a>
-, section 4.1.3.
+See section 4.1.3 in
+<a href="https://archive.stsci.edu/missions/tess/doc/TESS_Instrument_Handbook_v0.1.pdf"
+   target="_blank">TESS Instrument Handbook</a>,
+<br>
+or Collateral (Non-science) Pixels section in
+<a href="https://heasarc.gsfc.nasa.gov/docs/tess/data-products.html#collapseCollateral"
+   target="_blank">TESS Data Products Information at GSFC</a>.
 <br>
 """
     # extra margin-top below is a hack. Otherwise, the UI will bleed into skyview widget above it.
