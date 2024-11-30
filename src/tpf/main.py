@@ -873,6 +873,23 @@ def show_app(tic, sector, magnitude_limit=None):
     doc.add_next_tick_callback(lambda: create_app_ui(doc))
 
 
+def show_in_notebook(ui, notebook_url="localhost:8888"):
+    """Helper to show the Bokeh UI element in  a Jupyter notebook.
+
+    It is not used by the webapp. It's a helper for users to reuse
+    Bokeh UI Elements of the webapp in a notebook, e.g.,
+    to show the UI of ``create_app_body_ui_from_tpf()``.
+    """
+
+    from bokeh.io import show, output_notebook
+
+    def do_show(doc):
+        doc.add_root(ui)
+
+    output_notebook(verbose=False, hide_banner=True)
+    return show(do_show, notebook_url=notebook_url)
+
+
 def get_arg_as_int(args, arg_name, default_val=None):
     try:
         val = int(args.get(arg_name)[0])
