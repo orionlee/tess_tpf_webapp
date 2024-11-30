@@ -17,7 +17,14 @@ from .lk_patch.interact import (
     show_interact_widget,
 )
 from .ext_gaia_tic import ExtendedGaiaDR3TICInteractSkyCatalogProvider
-from .tpf_utils import get_tpf, is_tesscut, cutout_by_range, create_mask_for_target, create_background_per_pixel_lc
+from .tpf_utils import (
+    get_tpf,
+    is_tesscut,
+    has_non_science_pixels,
+    cutout_by_range,
+    create_mask_for_target,
+    create_background_per_pixel_lc,
+)
 from .lc_utils import read_lc, guess_lc_source
 
 import bokeh
@@ -283,17 +290,6 @@ def create_lc_viewer_ui():
     btn_period_double.on_click(lambda: do_change_period(2))
 
     return ui_layout
-
-
-def has_non_science_pixels(tpf):
-    # see figure 4.3 of https://archive.stsci.edu/missions/tess/doc/TESS_Instrument_Handbook_v0.1.pdf
-    # or https://heasarc.gsfc.nasa.gov/docs/tess/data-products.html#full-frame-images
-    return (
-        tpf.column < 45  # virtual pixels to the left
-        or tpf.column + tpf.shape[2] > 2092  # virtual pixels to the right
-        or tpf.row + tpf.shape[1] > 2048  # virtual pixels above
-        or tpf.row < 1  # virtual pixels below (Should not happen, but keep it here for just in case)
-    )
 
 
 def show_tpf_orientation_html(tpf):

@@ -88,6 +88,17 @@ def is_tesscut(tpf):
     return "astrocut" == tpf.meta.get("CREATOR")
 
 
+def has_non_science_pixels(tpf):
+    # see figure 4.3 of https://archive.stsci.edu/missions/tess/doc/TESS_Instrument_Handbook_v0.1.pdf
+    # or https://heasarc.gsfc.nasa.gov/docs/tess/data-products.html#full-frame-images
+    return (
+        tpf.column < 45  # virtual pixels to the left
+        or tpf.column + tpf.shape[2] > 2092  # virtual pixels to the right
+        or tpf.row + tpf.shape[1] > 2048  # virtual pixels above
+        or tpf.row < 1  # virtual pixels below (Should not happen, but keep it here for just in case)
+    )
+
+
 def cutout_by_range(tpf, aperture_mask, col_range, row_range):
     img_shape = tpf.flux[0].shape
 
