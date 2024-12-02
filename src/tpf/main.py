@@ -514,9 +514,11 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
                     return lc
 
             pixel_size_inches = 0.6
-            if tpf_trunc.flux[0].shape[0] < 7 or tpf_trunc.flux[0].shape[1] < 7:
-                # make each pixel larger if the cutout is large
+            # make each pixel larger if the cutout is zoomed-in
+            if tpf_trunc.flux[0].shape[0] < 6 or tpf_trunc.flux[0].shape[1] < 6:
                 pixel_size_inches = 1.5
+            elif tpf_trunc.flux[0].shape[0] < 8 or tpf_trunc.flux[0].shape[1] < 8:
+                pixel_size_inches = 1.1
 
             # scale marker size based on time range
             # (a proxy of number of dots to show)
