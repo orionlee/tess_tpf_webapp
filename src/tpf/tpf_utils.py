@@ -1,5 +1,9 @@
 import logging
+import os
 import warnings
+
+from retry import retry
+
 
 import astropy.units as u
 import numpy as np
@@ -8,6 +12,26 @@ import lightkurve as lk
 from .lk_patch.interact import _get_corrected_coordinate, _create_background_task
 
 log = logging.getLogger(__name__)
+
+if os.environ.get("MAST_ENABLE_CLOUD_DATASET", True):
+    # Prefer AWS to download MAST products (LCs, TPFs, etc.). Search is still on MAST
+    # (requires boto3)
+    from astroquery.mast import Observations
+
+    Observations.enable_cloud_dataset()
+
+
+LK_SEARCH_NUM_RETRIES = os.environ.get("LK_SEARCH_NUM_RETRIES", 4)
+
+
+@retry(IOError, tries=LK_SEARCH_NUM_RETRIES, delay=0.5, backoff=2, jitter=(0, 0.5))
+def search_targetpixelfile(*args, **kwargs):
+    return lk.search_targetpixelfile(*args, **kwargs)
+
+
+@retry(IOError, tries=LK_SEARCH_NUM_RETRIES, delay=0.5, backoff=2, jitter=(0, 0.5))
+def search_tesscut(*args, **kwargs):
+    return lk.search_tesscut(*args, **kwargs)
 
 
 async def _do_download_tesscut(sr):
@@ -48,7 +72,7 @@ async def get_tpf(tic, sector, msg_label):
 
 async def _do_get_tpf(tic, sector, msg_label):
     def do_search_tpf():
-        sr = lk.search_targetpixelfile(f"TIC{tic}", mission="TESS", sector=sector)
+        sr = search_targetpixelfile(f"TIC{tic}", mission="TESS", sector=sector)
         if len(sr) > 1:
             # exclude fast cadence data (20s), TPFs with fast cadence always has 2 min cadence counterparts
             # for the use case here, the fast cadence data is irrelevant. It'd just make the processing slower.
@@ -58,7 +82,7 @@ async def _do_get_tpf(tic, sector, msg_label):
     def do_search_tesscut():
         # TODO: query tesspoint to avoid returning sectors where the target is not on science pixels
         # e.g, TIC 160193537, sector 74, TessCut can return a TPF but the target is not on science pixels
-        sr = lk.search_tesscut(f"TIC{tic}", sector=sector)
+        sr = search_tesscut(f"TIC{tic}", sector=sector)
         return sr
 
     # Search TPF and TessCut in parallel, to speed up for cases for TessCut is to be used
@@ -86,6 +110,17 @@ async def _do_get_tpf(tic, sector, msg_label):
 
 def is_tesscut(tpf):
     return "astrocut" == tpf.meta.get("CREATOR")
+
+
+def has_non_science_pixels(tpf):
+    # see figure 4.3 of https://archive.stsci.edu/missions/tess/doc/TESS_Instrument_Handbook_v0.1.pdf
+    # or https://heasarc.gsfc.nasa.gov/docs/tess/data-products.html#full-frame-images
+    return (
+        tpf.column < 45  # virtual pixels to the left
+        or tpf.column + tpf.shape[2] > 2092  # virtual pixels to the right
+        or tpf.row + tpf.shape[1] > 2048  # virtual pixels above
+        or tpf.row < 1  # virtual pixels below (Should not happen, but keep it here for just in case)
+    )
 
 
 def cutout_by_range(tpf, aperture_mask, col_range, row_range):

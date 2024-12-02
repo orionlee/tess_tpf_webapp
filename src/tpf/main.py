@@ -17,7 +17,14 @@ from .lk_patch.interact import (
     show_interact_widget,
 )
 from .ext_gaia_tic import ExtendedGaiaDR3TICInteractSkyCatalogProvider
-from .tpf_utils import get_tpf, is_tesscut, cutout_by_range, create_mask_for_target, create_background_per_pixel_lc
+from .tpf_utils import (
+    get_tpf,
+    is_tesscut,
+    has_non_science_pixels,
+    cutout_by_range,
+    create_mask_for_target,
+    create_background_per_pixel_lc,
+)
 from .lc_utils import read_lc, guess_lc_source
 
 import bokeh
@@ -285,17 +292,6 @@ def create_lc_viewer_ui():
     return ui_layout
 
 
-def has_non_science_pixels(tpf):
-    # see figure 4.3 of https://archive.stsci.edu/missions/tess/doc/TESS_Instrument_Handbook_v0.1.pdf
-    # or https://heasarc.gsfc.nasa.gov/docs/tess/data-products.html#full-frame-images
-    return (
-        tpf.column < 45  # virtual pixels to the left
-        or tpf.column + tpf.shape[2] > 2092  # virtual pixels to the right
-        or tpf.row + tpf.shape[1] > 2048  # virtual pixels above
-        or tpf.row < 1  # virtual pixels below (Should not happen, but keep it here for just in case)
-    )
-
-
 def show_tpf_orientation_html(tpf):
     """ "Helper to visualize the TPF's orientation in the sky.
     Long arm is north, short arm with arrow is east.
@@ -326,8 +322,13 @@ def create_skyview_metadata_ui(tpf, ztf_search_radius, ztf_ngoodobsrel_min, skyp
         unreliable_pixels_warn_msg = """
 <span style="background-color: yellow; padding-left: 4px; padding-right: 4px;">Warning:</span>
 Some of the pixels are not science pixels.
-See <a href="https://archive.stsci.edu/missions/tess/doc/TESS_Instrument_Handbook_v0.1.pdf">TESS Instrument Handbook</a>
-, section 4.1.3.
+See section 4.1.3 in
+<a href="https://archive.stsci.edu/missions/tess/doc/TESS_Instrument_Handbook_v0.1.pdf"
+   target="_blank">TESS Instrument Handbook</a>,
+<br>
+or Collateral (Non-science) Pixels section in
+<a href="https://heasarc.gsfc.nasa.gov/docs/tess/data-products.html#collapseCollateral"
+   target="_blank">TESS Data Products Information at GSFC</a>.
 <br>
 """
     # extra margin-top below is a hack. Otherwise, the UI will bleed into skyview widget above it.
@@ -513,9 +514,11 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
                     return lc
 
             pixel_size_inches = 0.6
-            if tpf_trunc.flux[0].shape[0] < 7 or tpf_trunc.flux[0].shape[1] < 7:
-                # make each pixel larger if the cutout is large
+            # make each pixel larger if the cutout is zoomed-in
+            if tpf_trunc.flux[0].shape[0] < 6 or tpf_trunc.flux[0].shape[1] < 6:
                 pixel_size_inches = 1.5
+            elif tpf_trunc.flux[0].shape[0] < 8 or tpf_trunc.flux[0].shape[1] < 8:
+                pixel_size_inches = 1.1
 
             # scale marker size based on time range
             # (a proxy of number of dots to show)
@@ -870,6 +873,23 @@ def show_app(tic, sector, magnitude_limit=None):
     #
     doc = curdoc()
     doc.add_next_tick_callback(lambda: create_app_ui(doc))
+
+
+def show_in_notebook(ui, notebook_url="localhost:8888"):
+    """Helper to show the Bokeh UI element in  a Jupyter notebook.
+
+    It is not used by the webapp. It's a helper for users to reuse
+    Bokeh UI Elements of the webapp in a notebook, e.g.,
+    to show the UI of ``create_app_body_ui_from_tpf()``.
+    """
+
+    from bokeh.io import show, output_notebook
+
+    def do_show(doc):
+        doc.add_root(ui)
+
+    output_notebook(verbose=False, hide_banner=True)
+    return show(do_show, notebook_url=notebook_url)
 
 
 def get_arg_as_int(args, arg_name, default_val=None):
