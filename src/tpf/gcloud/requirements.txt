@@ -2,8 +2,23 @@ lightkurve>=2.5.0,<3.0
 # lightkurve not fully tested with  numpy 2. Use 1.x to be safe
 numpy<2.0
 retry>=0.9.2
-# for MAST Observations.enable_cloud_dataset
-boto3
+
+# for MAST Observations.enable_cloud_dataset()
+# Note:  requiring `boto3`  would be sufficient.
+# but the `pip install` is very slow, because it needs to
+# try many versions to get a compatible one.
+#
+# the compatibility problem is because
+# aiobotocore 2.15.2, (from s3fs-2024.10.0 , lightkurve-2.5.0),
+# has strict boto3 version requirement
+# Therefore, I pin them to speed things up
+#
+# One can test the requirements.txt by
+# pip install --dry-run -r requirements.txt
+#
+boto3==1.35.36
+aiobotocore==2.15.2
+
 # avoid bokeh 3.4.x for tap selection issue
 # Note: lightkurve includes bokeh as well,
 #       but a specific version is pinned to ensure better stability,
