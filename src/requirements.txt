@@ -1,6 +1,9 @@
 lightkurve>=2.5.0,<3.0
 # lightkurve not fully tested with  numpy 2. Use 1.x to be safe
 numpy<2.0
+retry>=0.9.2
+# for MAST Observations.enable_cloud_dataset
+boto3
 # avoid bokeh 3.4.x for tap selection issue
 # Note: lightkurve includes bokeh as well,
 #       but a specific version is pinned to ensure better stability,
