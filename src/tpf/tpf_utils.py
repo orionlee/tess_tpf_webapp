@@ -13,6 +13,14 @@ from .lk_patch.interact import _get_corrected_coordinate, _create_background_tas
 
 log = logging.getLogger(__name__)
 
+if os.environ.get("MAST_ENABLE_CLOUD_DATASET", True):
+    # Prefer AWS to download MAST products (LCs, TPFs, etc.). Search is still on MAST
+    # (requires boto3)
+    from astroquery.mast import Observations
+
+    Observations.enable_cloud_dataset()
+
+
 LK_SEARCH_NUM_RETRIES = os.environ.get("LK_SEARCH_NUM_RETRIES", 4)
 
 
