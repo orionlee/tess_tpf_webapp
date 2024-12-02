@@ -23,13 +23,14 @@ if os.environ.get("MAST_ENABLE_CLOUD_DATASET", True):
 
 LK_SEARCH_NUM_RETRIES = os.environ.get("LK_SEARCH_NUM_RETRIES", 4)
 
+# use tpf_utils.log instance so that retry warning would show up in gcloud log
 
-@retry(IOError, tries=LK_SEARCH_NUM_RETRIES, delay=0.5, backoff=2, jitter=(0, 0.5))
+@retry(IOError, tries=LK_SEARCH_NUM_RETRIES, delay=0.5, backoff=2, jitter=(0, 0.5), logger=log)
 def search_targetpixelfile(*args, **kwargs):
     return lk.search_targetpixelfile(*args, **kwargs)
 
 
-@retry(IOError, tries=LK_SEARCH_NUM_RETRIES, delay=0.5, backoff=2, jitter=(0, 0.5))
+@retry(IOError, tries=LK_SEARCH_NUM_RETRIES, delay=0.5, backoff=2, jitter=(0, 0.5), logger=log)
 def search_tesscut(*args, **kwargs):
     return lk.search_tesscut(*args, **kwargs)
 
