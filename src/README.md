@@ -7,6 +7,9 @@ gcloud deployment related artifacts, in [tpf/gcloud](tpf/gcloud) directory, are 
 
 Note: if the deployment artifacts in `tpf/gcloud` are modified, the version here need to be updated correspondingly.
 
+TODO: create a custom `cloudbuild.yaml` to avoid copying / syncing the artifacts from `tpf/gcloud`. The yaml can be extened from the
+inline yaml to first copying the artifacts using bash script. See the [doc](https://cloud.google.com/build/docs/configuring-builds/run-bash-scripts?#running_bash_scripts_on_disk) on cloudbuild.yaml .
+
 
 ## Tips / Caveats
 
