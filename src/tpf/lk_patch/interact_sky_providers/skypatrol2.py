@@ -1,3 +1,4 @@
+from functools import lru_cache
 import logging
 from typing import Tuple, Union
 
@@ -25,7 +26,8 @@ except Exception as e:
     _SKYPATROL_IMPORT_ERROR = e
 
 
-def _query_cone_region(coord, radius) -> Table:
+@lru_cache
+def _query_cone_region(ra_deg, dec_deg, radius_arcsec) -> Table:
     client = SkyPatrolClient(verbose=False)
 
     # URL for lightcurve: no easy way to construct one
@@ -34,9 +36,9 @@ def _query_cone_region(coord, radius) -> Table:
     # OPEN: consider to using AQDL and join with asasn_discoveries table
 
     df = client.cone_search(
-        coord.ra.to(u.deg).value,
-        coord.dec.to(u.deg).value,
-        radius.to(u.arcsec).value,
+        ra_deg,
+        dec_deg,
+        radius_arcsec,
         units="arcsec",
         catalog="stellar_main",  # the default master_list has too little data
         cols=["asas_sn_id", "gaia_mag", "ra_deg", "dec_deg", "pm_ra", "pm_dec"],
@@ -199,7 +201,11 @@ class SkyPatrol2InteractSkyCatalogProvider(InteractSkyCatalogProvider):
         return "SkyPatrol v2"
 
     def query_catalog(self) -> Table:
-        rs = _query_cone_region(self.coord, self.radius)
+        rs = _query_cone_region(
+            self.coord.ra.to(u.deg).value,
+            self.coord.dec.to(u.deg).value,
+            self.radius.to(u.arcsec).value,
+        )
 
         # Tweak result to fit interact_sky() needs
 

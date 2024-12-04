@@ -1,6 +1,4 @@
-#!/bin/sh
-
-proj_root=../../../
+#!/usr/bin/env bash
 
 base=`dirname $0`
 dest=$1
@@ -10,6 +8,11 @@ if [ "$dest" == "" ]; then
 fi
 
 set -e
+
+# first clean the destination dir to ensure a clean build
+if [ -d "$dest" ]; then
+  rm -fr $dest
+fi
 
 mkdir -p $dest
 mkdir -p $dest/tpf
@@ -35,7 +38,7 @@ echo         with errors in developer console suggesting failure in opening webs
 echo Action: In gcloud service dashboard, add environment variable BOKEH_ALLOW_WS_ORIGIN,
 echo         set it to the public hostname of the deployed service, and deploy again.
 echo
-echo Additional envrionment variables reocommended:
+echo Additional environment variables recommended:
 echo 1. Use CDN to serve bokeh assets: javascripts, etc.
 echo BOKEH_RESOURCES=cdn
 echo 2. Define the Python log level of the webapp, e.g.,

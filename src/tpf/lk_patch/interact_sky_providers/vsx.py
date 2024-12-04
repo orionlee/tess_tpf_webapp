@@ -1,3 +1,4 @@
+from functools import lru_cache
 import logging
 import re
 from typing import Tuple, Union
@@ -184,6 +185,7 @@ def _parse_response(result):
 
 # VSX API documentation: https://www.aavso.org/apis-aavso-resources#:~:text=The%20VSX%20API%20is%20not%20%22official%22%20yet
 # See also VSX in Vizier : https://vizier.cds.unistra.fr/viz-bin/VizieR-3?-source=B/vsx/vsx
+@lru_cache
 def _query_cone_region(ra2000, dec2000, radius_deg, magnitude_limit=None):
     """Perform cone search against live VSX catalog.
     The result is formatted to be compatible with Vizier in VSX (`B/vsx/vsx`) to the extent possible.
