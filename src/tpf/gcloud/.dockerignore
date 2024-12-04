@@ -1,4 +1,5 @@
 Dockerfile
+cloudbuild.yaml
 README.md
 assemble.sh
 *.pyc
