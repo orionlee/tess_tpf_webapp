@@ -8,6 +8,8 @@ import astropy.units as u
 from astropy.coordinates import SkyCoord
 from astropy.table import Table
 
+from ..timed import timed_call
+
 __all__ = ["InteractSkyCatalogProvider", "ProperMotionCorrectionMeta"]
 
 
@@ -89,6 +91,9 @@ class InteractSkyCatalogProvider(ABC):
         the magnitude of the target for the purpose of scaling in the plot.
         """
         pass
+
+    def query_catalog_timed(self) -> Table:
+        return timed_call(self.query_catalog, None, None, msg_prefix=f"{self.label}:query_catalog()")
 
     @abstractmethod
     def get_proper_motion_correction_meta(self) -> ProperMotionCorrectionMeta:

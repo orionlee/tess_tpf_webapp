@@ -63,6 +63,16 @@ def set_log_level_from_env():
     return level_str
 
 
+def set_log_timed_from_env():
+    from .lk_patch.timed import log as timed_log
+
+    timed_str = os.environ.get("TESS_TPF_WEBAPP_LOG_TIMED", "false")
+    log_timed = timed_str.lower() == "true"
+    if log_timed:
+        timed_log.setLevel("DEBUG")
+    return log_timed
+
+
 def get_value_in_float(input: TextInput, default=None):
     val = input.value
     try:
@@ -913,6 +923,7 @@ def get_arg_as_float(args, arg_name, default_val=None):
 #
 if __name__.startswith("bokeh_app_"):  # invoked from `bokeh serve`
     set_log_level_from_env()
+    set_log_timed_from_env()
     args = curdoc().session_context.request.arguments
     tic = get_arg_as_int(args, "tic", None)  # default value for sample
     sector = get_arg_as_int(args, "sector", None)

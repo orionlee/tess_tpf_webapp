@@ -698,7 +698,7 @@ async def async_parse_and_add_catalogs_figure_elements(
     # 2. make the remote queries (run in parallel in background)
     result_tasks = []
     for provider in providers:
-        a_task = _create_background_task(provider.query_catalog)
+        a_task = _create_background_task(provider.query_catalog_timed)
         result_tasks.append(a_task)
     results = []
     for provider, a_task in zip(providers, result_tasks):
