@@ -10,6 +10,8 @@ import numpy as np
 
 import lightkurve as lk
 from .lk_patch.interact import _get_corrected_coordinate, _create_background_task
+from .lk_patch.timed import timed
+
 
 log = logging.getLogger(__name__)
 
@@ -35,7 +37,13 @@ def search_tesscut(*args, **kwargs):
     return lk.search_tesscut(*args, **kwargs)
 
 
-async def _do_download_tesscut(sr):
+@timed()
+def _do_download_spoc_tpf(sr):
+    return sr[-1].download()
+
+
+@timed()
+def _do_download_tesscut(sr):
     cutout_size = (11, 11)  # OPEN: would be too small for bright stars
     # TODO: query TIC catalog to backfill proper motion / TESSMAG
     # (used by the webapp)
@@ -72,6 +80,8 @@ async def get_tpf(tic, sector, msg_label):
 
 
 async def _do_get_tpf(tic, sector, msg_label):
+
+    @timed()
     def do_search_tpf():
         sr = search_targetpixelfile(f"TIC{tic}", mission="TESS", sector=sector)
         if len(sr) > 1:
@@ -80,6 +90,7 @@ async def _do_get_tpf(tic, sector, msg_label):
             sr = sr[sr.exptime > 60 * u.s]
         return sr
 
+    @timed()
     def do_search_tesscut():
         # TODO: query tesspoint to avoid returning sectors where the target is not on science pixels
         # e.g, TIC 160193537, sector 74, TessCut can return a TPF but the target is not on science pixels
@@ -95,14 +106,14 @@ async def _do_get_tpf(tic, sector, msg_label):
     if len(sr) > 0:
         # case downloading a TPF
         sr_tc_task.cancel()  # no longer needed
-        tpf = sr[-1].download()
+        tpf = _do_download_spoc_tpf(sr)
         return tpf, sr
 
     sr = await sr_tc_task
     if len(sr) > 0:
         # case downloading a TessCut
         log.debug(f"No TPF found for {msg_label}. Use TessCut.")
-        tpf = await _do_download_tesscut(sr)
+        tpf = _do_download_tesscut(sr)
         return tpf, sr
 
     # case no TPF nor TessCut

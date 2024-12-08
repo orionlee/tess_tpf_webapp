@@ -1,3 +1,4 @@
+from functools import lru_cache
 from typing import Tuple, Union
 
 import astropy.units as u
@@ -19,6 +20,15 @@ def _to_lc_url(oid, data_release, format):
         return url
     else:
         return [_to_lc_url(a_oid, data_release, format) for a_oid in oid]
+
+        # OPEN: consider memoize the result, as astroquery v0.47 does not support caching for Irsa
+
+
+@lru_cache
+def _query_cone_region(ra_deg, dec_deg, radius_arcsec, catalog) -> Table:
+    # Note: memoize the result: astroquery (as of v0.47) does not support caching for Irsa
+    coord = SkyCoord(ra_deg * u.deg, dec_deg * u.deg, frame="icrs")
+    return Irsa.query_region(coord, catalog=catalog, spatial="Cone", radius=radius_arcsec * u.arcsec)
 
 
 class ZTFInteractSkyCatalogProvider(InteractSkyCatalogProvider):
@@ -130,8 +140,9 @@ class ZTFInteractSkyCatalogProvider(InteractSkyCatalogProvider):
             return Table(data=empty_data)
 
         catalog = f"ztf_objects_dr{self.data_release}"
-        # OPEN: consider memoize the result, as astroquery v0.47 does not support caching for Irsa
-        rs = Irsa.query_region(coordinates=self.coord, catalog=catalog, spatial="Cone", radius=self.radius)
+        rs = _query_cone_region(
+            self.coord.ra.to(u.deg).value, self.coord.dec.to(u.deg).value, self.radius.to(u.arcsec).value, catalog
+        )
 
         if self.magnitude_limit is not None:
             # column medianmag better reflects observed mag, but it could be 0
