@@ -455,13 +455,13 @@ class GaiaDR3TICInteractSkyCatalogProvider(GaiaDR3InteractSkyCatalogProvider):
 
         tic_rs = rs_list[self.tic_catalog_name]
         if self.exclude_tic_duplicates:
-            # exclude duplicates: 2MASS source split into multiple entries
+            # exclude duplicates: 2MASS source split into multiple entries, unless it's the target
             # https://outerspace.stsci.edu/display/TESS/TIC+v8.2+and+CTL+v8.xx+Data+Release+Notes#:~:text=SPLIT%20stars
-            tic_rs = tic_rs[tic_rs["Disp"] != "DUPLICATE"]
+            tic_rs = tic_rs[(tic_rs["Disp"] != "DUPLICATE") | (tic_rs["TIC"] == self.target_tic)]
         if self.exclude_tic_artifacts:
-            # exclude artifacts: spurious data (usually from 2MASS)
+            # exclude artifacts: spurious data (usually from 2MASS), unless it's the target
             # https://outerspace.stsci.edu/display/TESS/TIC+v8.2+and+CTL+v8.xx+Data+Release+Notes#:~:text=Artifacts%20are%20generally%20spurious
-            tic_rs = tic_rs[tic_rs["Disp"] != "ARTIFACT"]
+            tic_rs = tic_rs[(tic_rs["Disp"] != "ARTIFACT") | (tic_rs["TIC"] == self.target_tic)]
 
         # Join Gaia and TIC results
         # first do some preparation then join the 2 tables
@@ -522,7 +522,10 @@ class GaiaDR3TICInteractSkyCatalogProvider(GaiaDR3InteractSkyCatalogProvider):
             return
 
         target_row = rs[rs["TIC"] == str(self.target_tic)]
+
         if len(target_row) < 1:
+            warnings.warn(f"Target TIC {self.target_tic} not found in query result. Cannot compute Delta Tmag.")
+            rs["Delta_Tmag"] = np.ma.masked_all(len(rs))  # add a dummy column, expected by the caller
             return
         else:
             target_row = target_row[0]
