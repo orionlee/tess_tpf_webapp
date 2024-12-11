@@ -701,13 +701,16 @@ async def create_app_body_ui(tic, sector, magnitude_limit=None):
         sector = None if sector is None or sector == "" else int(sector)
         magnitude_limit = None if magnitude_limit is None or magnitude_limit == "" else float(magnitude_limit)
     except Exception as err:
-        return Div(text=f"<h3>Skyview</h3> Invalid Parameter. Error: {err}", name="skyview")
+        return Div(text=f"<h3>Skyview</h3> Invalid Parameter. Error: {err}", name="skyview"), None
 
     if tic is None:
-        return column(
-            Div(text="<h3>Skyview</h3>", name="skyview"),
-            Div(text="<h3>Pixels Inspection</h3>", name="tpf_interact_ctr"),
-            Div(text="<h3>Lightcurve</h3>", name="lc_viewer"),
+        return (
+            column(
+                Div(text="<h3>Skyview</h3>", name="skyview"),
+                Div(text="<h3>Pixels Inspection</h3>", name="tpf_interact_ctr"),
+                Div(text="<h3>Lightcurve</h3>", name="lc_viewer"),
+            ),
+            None,
         )
 
     if sector is not None:
@@ -719,7 +722,7 @@ async def create_app_body_ui(tic, sector, magnitude_limit=None):
 
     if tpf is None:
         log.debug(f"Cannot find TPF or TESSCut for {msg_label}. No plot to be made.")
-        return Div(text=f"<h3>SkyView</h3> Cannot find Pixel data for {msg_label}", name="skyview")
+        return Div(text=f"<h3>SkyView</h3> Cannot find Pixel data for {msg_label}", name="skyview"), None
 
     # set at info level, as it might be useful to gather statistics on the type of tpfs being plotted ()
     log.info(f"Plot Skyview: {tpf}, sector={tpf.meta.get('SECTOR')}, exptime={sr.exptime[-1]}, TessCut={is_tesscut(tpf)}")
@@ -861,6 +864,8 @@ def _progressive_plot_catalogs(doc, catalog_plot_fns):
     # - effectively, the result is still shown progressively in typical cases
     #   as gaiadr3_tic, the first catalog, tends to be the fastest,
     #   while vsx, the last catalog, tends to be the slowest.
+    if catalog_plot_fns is None:
+        return
     for i, fn in enumerate(catalog_plot_fns):
         doc.add_timeout_callback(fn, i * 100 + 1000)
 
@@ -897,11 +902,11 @@ def show_app(tic, sector, magnitude_limit=None):
 
         ui_main.children = [ui_body]
         doc.add_root(ui_ctr)
+        _progressive_plot_catalogs(doc, catalog_plot_fns)
         if ui_body.name == "app_body_interactive":
             # the UI for monitoring WebSocket connection is only relevant
             # in the normal case that interactive widgets are to be shown.
             add_connection_lost_ui(doc)
-        _progressive_plot_catalogs(doc, catalog_plot_fns)
 
     #
     # the actual entry point
