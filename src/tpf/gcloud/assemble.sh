@@ -31,7 +31,8 @@ echo cd $dest
 echo "# sanity test locally"
 echo bokeh serve --show tpf
 echo "# actual deployment with Google Cloud SDK"
-echo gcloud run deploy --source .
+echo "# - SHOULD remove cloudbuild.yaml, as it only works in continuous deployment environment."
+echo rm cloudbuild.yaml; gcloud run deploy --source .
 echo
 echo Note:   The first deployment, the app  would not work, returning blank page
 echo         with errors in developer console suggesting failure in opening websockets.
