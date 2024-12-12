@@ -21,6 +21,10 @@ cp --update --archive  $base/../*.py  $dest/tpf
 cp --update --archive  --recursive $base/../lk_patch  $dest/tpf
 cp --update --archive  $base/*  $dest
 cp --update --archive  $base/.*  $dest
+# the cloudbuild.yaml is setup for use in continuous deployment
+# it MUST not be in $dest ,
+# as it would be picked up by "gcloud run deploy --source .", and would create bad builds.
+rm --force $dest/cloudbuild.yaml
 
 ls -l $dest/ $dest/tpf
 
@@ -31,8 +35,7 @@ echo cd $dest
 echo "# sanity test locally"
 echo bokeh serve --show tpf
 echo "# actual deployment with Google Cloud SDK"
-echo "# - SHOULD remove cloudbuild.yaml, as it only works in continuous deployment environment."
-echo rm cloudbuild.yaml; gcloud run deploy --source .
+echo gcloud run deploy --source .
 echo
 echo Note:   The first deployment, the app  would not work, returning blank page
 echo         with errors in developer console suggesting failure in opening websockets.
