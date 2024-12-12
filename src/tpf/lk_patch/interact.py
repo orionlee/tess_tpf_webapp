@@ -498,7 +498,7 @@ def _row_to_dict(source, idx):
     return {k: source.data[k][idx] for k in source.data}
 
 
-def add_catalog_figure_elements(provider, result, tpf, fig, message_selected_target, arrow_4_selected):
+def add_catalog_figure_elements(provider, result, tpf, fig, ui_ctr, message_selected_target, arrow_4_selected):
 
     # result: from  provider.query_catalog()
     if result is None:
@@ -656,6 +656,16 @@ Selected:<br>
             arrow_4_selected.visible = False
 
     source.selected.on_change("indices", show_arrow_at_target)
+
+    # 4. enable the catalog checkbox (if present)
+
+    # note: need to dynamically locate the widget, because it is conditionally
+    # created after providers initialization
+    catalog_select_ui = ui_ctr.select_one({"name": "catalog_select_ctl"})
+    if catalog_select_ui is not None:
+        cat_idx = catalog_select_ui.labels.index(provider.label)
+        catalog_select_ui.active.append(cat_idx)
+
     return r
 
 
@@ -668,7 +678,7 @@ def _create_background_task(func, *args, **kwargs):
 
 
 async def async_parse_and_add_catalogs_figure_elements(
-    catalogs, magnitude_limit, tpf, fig_tpf, message_selected_target, arrow_4_selected
+    catalogs, magnitude_limit, tpf, fig_tpf, ui_ctr, message_selected_target, arrow_4_selected
 ):
     # 1. create provider instances from catalog specifications
     providers = []
@@ -724,7 +734,7 @@ async def async_parse_and_add_catalogs_figure_elements(
                 )
             try:
                 renderer = add_catalog_figure_elements(
-                    provider, result, tpf, fig_tpf, message_selected_target, arrow_4_selected
+                    provider, result, tpf, fig_tpf, ui_ctr, message_selected_target, arrow_4_selected
                 )
             except Exception as err:
                 renderer = fig_tpf.scatter()  # a dummy renderer
@@ -1308,8 +1318,9 @@ def show_interact_widget(
 def _create_select_catalog_ui(providers, ui_ctr):
     select_catalog_ui = CheckboxGroup(
         labels=[p.label for p in providers],
-        active=list(range(0, len(providers))),  # make all checked
+        active=[],  # default not-checked, they'll be checked as the catalog data is rendered
         inline=True,
+        name="catalog_select_ctl",
     )
     # add more horizontal spacing between checkboxes
     select_catalog_ui.stylesheets = [
@@ -1414,6 +1425,8 @@ def show_skyview_widget(tpf, notebook_url=None, aperture_mask="empty", catalogs=
     async def async_create_interact_ui():
         tpf_source = prepare_tpf_datasource(tpf, aperture_mask)
 
+        ui_ctr = layout()  # the container for the whole skyview UI
+
         # The data source includes metadata for hover-over tooltips
 
         # Create the TPF figure and its stretch slider
@@ -1433,7 +1446,7 @@ def show_skyview_widget(tpf, notebook_url=None, aperture_mask="empty", catalogs=
         message_selected_target, arrow_4_selected = make_interact_sky_selection_elements(fig_tpf)
 
         providers, catalog_plot_fns = await async_parse_and_add_catalogs_figure_elements(
-            catalogs, magnitude_limit, tpf, fig_tpf, message_selected_target, arrow_4_selected
+            catalogs, magnitude_limit, tpf, fig_tpf, ui_ctr, message_selected_target, arrow_4_selected
         )
 
         # Optionally override the default title
@@ -1452,22 +1465,22 @@ def show_skyview_widget(tpf, notebook_url=None, aperture_mask="empty", catalogs=
 
         # Layout all of the plots
         if len(catalogs) < 2:
-            widgets_and_figures = layout(
+            ui_ctr.children = [
                 Row(
                     Column(fig_tpf, stretch_slider),
                     message_selected_target,
                 )
-            )
+            ]
         else:
             select_catalog_ui = _create_select_catalog_ui(providers, fig_tpf)
-            widgets_and_figures = layout(
+            ui_ctr.children = [
                 Row(
                     Column(fig_tpf, select_catalog_ui, stretch_slider),
                     message_selected_target,
                 )
-            )
+            ]
 
-        return widgets_and_figures, catalog_plot_fns
+        return ui_ctr, catalog_plot_fns
 
     def create_interact_ui(doc):
         # bokeh-specific trick to use async codes to create the UI
