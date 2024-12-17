@@ -20,6 +20,8 @@ import logging
 import traceback
 import warnings
 
+from functools import partial
+
 import numpy as np
 from astropy.coordinates import SkyCoord, Angle
 from astropy.stats import sigma_clip
@@ -39,6 +41,7 @@ log = logging.getLogger(__name__)
 _BOKEH_IMPORT_ERROR = None
 try:
     import bokeh  # Import bokeh first so we get an ImportError we can catch
+    from bokeh.document import without_document_lock
     from bokeh.io import show, output_notebook
     from bokeh.plotting import figure, ColumnDataSource
     from bokeh.models import (
@@ -678,7 +681,7 @@ def _create_background_task(func, *args, **kwargs):
 
 
 async def async_parse_and_add_catalogs_figure_elements(
-    catalogs, magnitude_limit, tpf, fig_tpf, ui_ctr, message_selected_target, arrow_4_selected
+    catalogs, magnitude_limit, tpf, doc, fig_tpf, ui_ctr, message_selected_target, arrow_4_selected
 ):
     # 1. create provider instances from catalog specifications
     providers = []
@@ -714,24 +717,11 @@ async def async_parse_and_add_catalogs_figure_elements(
     # 3. create functions that will plot the results
     #   (so that the caller can invoke them after main plot is done, to make output shown progressively)
     def create_catalog_plot_fn(provider, result_task):
-        async def do_catalog_init():
-            try:
-                result = await result_task
-            except Exception as err:
-                # ensure the error from a provider would not stop the whole plot,
-                # e.g., if an user plots with Gaia and ZTF data, if ZTF times out,
-                # the user would still see Gaia data
-                result = None
-                # user format_exc() instead of format_exception(err) to avoid
-                # format_exception() signature change in Python 3.10
-                err_str = f"{type(err).__name__}: {err}\n" + "".join(traceback.format_exc())
-                warnings.warn(
-                    (
-                        f"Error while getting data from {provider.label}. Its data will not be in the plot. "
-                        f"The error: {err_str}"
-                    ),
-                    LightkurveWarning,
-                )
+
+        # Make async update works using a pattern derived from:
+        # https://docs.bokeh.org/en/latest/docs/user_guide/server/app.html#updating-from-unlocked-callbacks
+
+        async def do_catalog_init_locked(result):
             try:
                 renderer = add_catalog_figure_elements(
                     provider, result, tpf, fig_tpf, ui_ctr, message_selected_target, arrow_4_selected
@@ -749,7 +739,28 @@ async def async_parse_and_add_catalogs_figure_elements(
             renderer.name = f"catalog_{provider.label}"  # name the renderer so that they can be located later on.
             return renderer
 
-        return do_catalog_init
+        @without_document_lock
+        async def do_catalog_init_unlocked():
+            try:
+                result = await result_task
+            except Exception as err:
+                # ensure the error from a provider would not stop the whole plot,
+                # e.g., if an user plots with Gaia and ZTF data, if ZTF times out,
+                # the user would still see Gaia data
+                result = None
+                # user format_exc() instead of format_exception(err) to avoid
+                # format_exception() signature change in Python 3.10
+                err_str = f"{type(err).__name__}: {err}\n" + "".join(traceback.format_exc())
+                warnings.warn(
+                    (
+                        f"Error while getting data from {provider.label}. Its data will not be in the plot. "
+                        f"The error: {err_str}"
+                    ),
+                    LightkurveWarning,
+                )
+            doc.add_next_tick_callback(partial(do_catalog_init_locked, result=result))
+
+        return do_catalog_init_unlocked
 
     catalog_plot_fns = [create_catalog_plot_fn(p, t) for p, t in zip(providers, result_tasks)]
 
@@ -1422,7 +1433,7 @@ def show_skyview_widget(tpf, notebook_url=None, aperture_mask="empty", catalogs=
 
     aperture_mask = tpf._parse_aperture_mask(aperture_mask)
 
-    async def async_create_interact_ui():
+    async def async_create_interact_ui(doc):
         tpf_source = prepare_tpf_datasource(tpf, aperture_mask)
 
         ui_ctr = layout()  # the container for the whole skyview UI
@@ -1446,7 +1457,7 @@ def show_skyview_widget(tpf, notebook_url=None, aperture_mask="empty", catalogs=
         message_selected_target, arrow_4_selected = make_interact_sky_selection_elements(fig_tpf)
 
         providers, catalog_plot_fns = await async_parse_and_add_catalogs_figure_elements(
-            catalogs, magnitude_limit, tpf, fig_tpf, ui_ctr, message_selected_target, arrow_4_selected
+            catalogs, magnitude_limit, tpf, doc, fig_tpf, ui_ctr, message_selected_target, arrow_4_selected
         )
 
         # Optionally override the default title
@@ -1487,25 +1498,11 @@ def show_skyview_widget(tpf, notebook_url=None, aperture_mask="empty", catalogs=
         # (the naive asyncio.run() does not work in a bokeh server,
         #  as it has its own event loop.)
         async def do_create_ui():
-            ui, catalog_plot_fns = await async_create_interact_ui()
+            ui, catalog_plot_fns = await async_create_interact_ui(doc)
             doc.add_root(ui)
 
-            # Use timeout to make the catalog data plot shown progressively
-            # Caveats:
-            # - empirically, it seems that one needs to wait a bit before
-            #   invoking the functions, to ensure the base pixel plot is rendered
-            #   so a minimal time (1000) is added.
-            # - the timeout still imposes a strict order of plotting the data, e.g.
-            #   if catalogs ["gaiadr3_tic", "ztf", "vsx"] are chosen, and
-            #   ztf calls takes a long time, "vsx" results won't be plotted until
-            #   ztf results are plotted.
-            #   I think it's because when the async plot functions is invoked, the base
-            #   bokeh Document is locked, thus preventing subsequent functions from being invoked.
-            # - effectively, the result is still shown progressively in typical cases
-            #   as gaiadr3_tic, the first catalog, tends to be the fastest,
-            #   while vsx, the last catalog, tends to be the slowest.
-            for i, fn in enumerate(catalog_plot_fns):
-                doc.add_timeout_callback(fn, i * 100 + 1000)
+            for fn in catalog_plot_fns:
+                doc.add_timeout_callback(fn, 0)
 
         doc.add_next_tick_callback(do_create_ui)
 
