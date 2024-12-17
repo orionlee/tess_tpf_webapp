@@ -887,6 +887,7 @@ def show_app(tic, sector, magnitude_limit=None):
                 )
                 err_msg = f"Error in creating Inspector. {type(e).__name__}: {e}"
             ui_body = Div(text=err_msg)
+            catalog_plot_fns = None
 
         ui_main.children = [ui_body]
         doc.add_root(ui_ctr)
