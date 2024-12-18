@@ -747,7 +747,22 @@ async def async_parse_and_add_catalogs_figure_elements(
         async def do_catalog_init_unlocked():
             try:
                 result = await result_task
+            except IOError as err:
+                # for IOError: the warning message is relatively brief
+                # ensure the error from a provider would not stop the whole plot,
+                # e.g., if an user plots with Gaia and ZTF data, if ZTF times out,
+                # the user would still see Gaia data
+                result = None
+                err_str = f"{type(err).__name__}: {err}"
+                warnings.warn(
+                    (
+                        f"IOError while getting data from {provider.label}. Its data will not be in the plot. "
+                        f"The error: {err_str}"
+                    ),
+                    LightkurveWarning,
+                )
             except Exception as err:
+                # for non-IOError: the warning message is verbose, including full stacktrace
                 # ensure the error from a provider would not stop the whole plot,
                 # e.g., if an user plots with Gaia and ZTF data, if ZTF times out,
                 # the user would still see Gaia data
