@@ -24,7 +24,7 @@ cp --update --archive  $base/.*  $dest
 # the cloudbuild.yaml is setup for use in continuous deployment
 # it MUST not be in $dest ,
 # as it would be picked up by "gcloud run deploy --source .", and would create bad builds.
-rm --force $dest/cloudbuild.yaml
+rm -f $dest/cloudbuild.yaml
 
 ls -l $dest/ $dest/tpf
 
