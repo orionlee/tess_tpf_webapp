@@ -503,9 +503,18 @@ def _row_to_dict(source, idx):
 
 def add_catalog_figure_elements(provider, result, tpf, fig, ui_ctr, message_selected_target, arrow_4_selected):
 
+    def check_catalog_checkbox_if_present():
+        # note: need to dynamically locate the widget, because it is conditionally
+        # created after providers initialization
+        catalog_select_ui = ui_ctr.select_one({"name": "catalog_select_ctl"})
+        if catalog_select_ui is not None:
+            cat_idx = catalog_select_ui.labels.index(provider.label)
+            catalog_select_ui.active.append(cat_idx)
+
     # result: from  provider.query_catalog()
     if result is None:
         # case empty result, return a dummy renderer
+        check_catalog_checkbox_if_present()  # still need to mark the checkbox to indicate it's done
         return fig.scatter()
 
     # do proper motion correction, if needed
@@ -660,14 +669,8 @@ Selected:<br>
 
     source.selected.on_change("indices", show_arrow_at_target)
 
-    # 4. enable the catalog checkbox (if present)
-
-    # note: need to dynamically locate the widget, because it is conditionally
-    # created after providers initialization
-    catalog_select_ui = ui_ctr.select_one({"name": "catalog_select_ctl"})
-    if catalog_select_ui is not None:
-        cat_idx = catalog_select_ui.labels.index(provider.label)
-        catalog_select_ui.active.append(cat_idx)
+    # 4. check the catalog checkbox to indicate to users that the data is ready.
+    check_catalog_checkbox_if_present()
 
     return r
 
