@@ -503,9 +503,18 @@ def _row_to_dict(source, idx):
 
 def add_catalog_figure_elements(provider, result, tpf, fig, ui_ctr, message_selected_target, arrow_4_selected):
 
+    def check_catalog_checkbox_if_present():
+        # note: need to dynamically locate the widget, because it is conditionally
+        # created after providers initialization
+        catalog_select_ui = ui_ctr.select_one({"name": "catalog_select_ctl"})
+        if catalog_select_ui is not None:
+            cat_idx = catalog_select_ui.labels.index(provider.label)
+            catalog_select_ui.active.append(cat_idx)
+
     # result: from  provider.query_catalog()
     if result is None:
         # case empty result, return a dummy renderer
+        check_catalog_checkbox_if_present()  # still need to mark the checkbox to indicate it's done
         return fig.scatter()
 
     # do proper motion correction, if needed
@@ -660,14 +669,8 @@ Selected:<br>
 
     source.selected.on_change("indices", show_arrow_at_target)
 
-    # 4. enable the catalog checkbox (if present)
-
-    # note: need to dynamically locate the widget, because it is conditionally
-    # created after providers initialization
-    catalog_select_ui = ui_ctr.select_one({"name": "catalog_select_ctl"})
-    if catalog_select_ui is not None:
-        cat_idx = catalog_select_ui.labels.index(provider.label)
-        catalog_select_ui.active.append(cat_idx)
+    # 4. check the catalog checkbox to indicate to users that the data is ready.
+    check_catalog_checkbox_if_present()
 
     return r
 
@@ -722,6 +725,7 @@ async def async_parse_and_add_catalogs_figure_elements(
         # https://docs.bokeh.org/en/latest/docs/user_guide/server/app.html#updating-from-unlocked-callbacks
 
         async def do_catalog_init_locked(result):
+            log.debug(f"do_catalog_init_locked() for {provider.label}: {len(result) if result is not None else None}")
             try:
                 renderer = add_catalog_figure_elements(
                     provider, result, tpf, fig_tpf, ui_ctr, message_selected_target, arrow_4_selected
@@ -743,7 +747,22 @@ async def async_parse_and_add_catalogs_figure_elements(
         async def do_catalog_init_unlocked():
             try:
                 result = await result_task
+            except IOError as err:
+                # for IOError: the warning message is relatively brief
+                # ensure the error from a provider would not stop the whole plot,
+                # e.g., if an user plots with Gaia and ZTF data, if ZTF times out,
+                # the user would still see Gaia data
+                result = None
+                err_str = f"{type(err).__name__}: {err}"
+                warnings.warn(
+                    (
+                        f"IOError while getting data from {provider.label}. Its data will not be in the plot. "
+                        f"The error: {err_str}"
+                    ),
+                    LightkurveWarning,
+                )
             except Exception as err:
+                # for non-IOError: the warning message is verbose, including full stacktrace
                 # ensure the error from a provider would not stop the whole plot,
                 # e.g., if an user plots with Gaia and ZTF data, if ZTF times out,
                 # the user would still see Gaia data
@@ -758,6 +777,7 @@ async def async_parse_and_add_catalogs_figure_elements(
                     ),
                     LightkurveWarning,
                 )
+            log.debug(f"Scheduling do_catalog_init_locked() for {provider.label}.")
             doc.add_next_tick_callback(partial(do_catalog_init_locked, result=result))
 
         return do_catalog_init_unlocked

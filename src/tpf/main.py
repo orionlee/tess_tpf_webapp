@@ -53,6 +53,7 @@ log = logging.getLogger(__name__)
 
 def set_log_level_from_env():
     from .tpf_utils import log as tpf_utils_log
+    from .lk_patch.interact import log as interact_log
 
     # use Python standard string constant in
     #  https://docs.python.org/3/howto/logging.html
@@ -60,6 +61,7 @@ def set_log_level_from_env():
     if level_str:
         log.setLevel(level_str)
         tpf_utils_log.setLevel(level_str)
+        interact_log.setLevel(level_str)
     return level_str
 
 
