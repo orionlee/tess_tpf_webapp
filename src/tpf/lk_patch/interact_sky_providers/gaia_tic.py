@@ -404,7 +404,7 @@ class GaiaDR3TICInteractSkyCatalogProvider(GaiaDR3InteractSkyCatalogProvider):
             gaiadr3_var_scatter_marker,
         )
         # TIC-specific
-        self.cols_for_source += ["TIC", "Tmag"]
+        self.cols_for_source += ["TIC", "Tmag", "Disp"]
         self.tic_catalog_name = "IV/39/tic82"
         self.exclude_tic_duplicates = True
         self.exclude_tic_artifacts = True
@@ -565,6 +565,9 @@ class GaiaDR3TICInteractSkyCatalogProvider(GaiaDR3InteractSkyCatalogProvider):
             if (np.isfinite(data["Delta_Tmag"])) and data["TIC"] != str(self.target_tic):
                 key_vals["ΔTmag"] = f"{data['Delta_Tmag']:.3f}"
             # else: skip delta,  if delta is nan, or if the selected object is the target itself
+
+        if data["Disp"] != "":  # show disposition only if there is something to show (artifacts,duplicates)
+            key_vals["Disposition"] = data["Disp"]
 
         # append Gaia's key-value pairs so they appear after TICs
         key_vals.update(gaia_key_vals)

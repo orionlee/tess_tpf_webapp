@@ -21,6 +21,10 @@ cp --update --archive  $base/../*.py  $dest/tpf
 cp --update --archive  --recursive $base/../lk_patch  $dest/tpf
 cp --update --archive  $base/*  $dest
 cp --update --archive  $base/.*  $dest
+# the cloudbuild.yaml is setup for use in continuous deployment
+# it MUST not be in $dest ,
+# as it would be picked up by "gcloud run deploy --source .", and would create bad builds.
+rm --force $dest/cloudbuild.yaml
 
 ls -l $dest/ $dest/tpf
 

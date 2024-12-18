@@ -20,6 +20,8 @@ import logging
 import traceback
 import warnings
 
+from functools import partial
+
 import numpy as np
 from astropy.coordinates import SkyCoord, Angle
 from astropy.stats import sigma_clip
@@ -39,6 +41,7 @@ log = logging.getLogger(__name__)
 _BOKEH_IMPORT_ERROR = None
 try:
     import bokeh  # Import bokeh first so we get an ImportError we can catch
+    from bokeh.document import without_document_lock
     from bokeh.io import show, output_notebook
     from bokeh.plotting import figure, ColumnDataSource
     from bokeh.models import (
@@ -498,7 +501,7 @@ def _row_to_dict(source, idx):
     return {k: source.data[k][idx] for k in source.data}
 
 
-def add_catalog_figure_elements(provider, result, tpf, fig, message_selected_target, arrow_4_selected):
+def add_catalog_figure_elements(provider, result, tpf, fig, ui_ctr, message_selected_target, arrow_4_selected):
 
     # result: from  provider.query_catalog()
     if result is None:
@@ -656,6 +659,16 @@ Selected:<br>
             arrow_4_selected.visible = False
 
     source.selected.on_change("indices", show_arrow_at_target)
+
+    # 4. enable the catalog checkbox (if present)
+
+    # note: need to dynamically locate the widget, because it is conditionally
+    # created after providers initialization
+    catalog_select_ui = ui_ctr.select_one({"name": "catalog_select_ctl"})
+    if catalog_select_ui is not None:
+        cat_idx = catalog_select_ui.labels.index(provider.label)
+        catalog_select_ui.active.append(cat_idx)
+
     return r
 
 
@@ -668,7 +681,7 @@ def _create_background_task(func, *args, **kwargs):
 
 
 async def async_parse_and_add_catalogs_figure_elements(
-    catalogs, magnitude_limit, tpf, fig_tpf, message_selected_target, arrow_4_selected
+    catalogs, magnitude_limit, tpf, doc, fig_tpf, ui_ctr, message_selected_target, arrow_4_selected
 ):
     # 1. create provider instances from catalog specifications
     providers = []
@@ -700,45 +713,58 @@ async def async_parse_and_add_catalogs_figure_elements(
     for provider in providers:
         a_task = _create_background_task(provider.query_catalog_timed)
         result_tasks.append(a_task)
-    results = []
-    for provider, a_task in zip(providers, result_tasks):
-        try:
-            result = await a_task
-        except Exception as err:
-            # ensure the error from a provider would not stop the whole plot,
-            # e.g., if an user plots with Gaia and ZTF data, if ZTF times out,
-            # the user would still see Gaia data
-            result = None
-            # user format_exc() instead of format_exception(err) to avoid
-            # format_exception() signature change in Python 3.10
-            err_str = f"{type(err).__name__}: {err}\n" + "".join(traceback.format_exc())
-            warnings.warn(
-                (
-                    f"Error while getting data from {provider.label}. Its data will not be in the plot. "
-                    f"The error: {err_str}"
-                ),
-                LightkurveWarning,
-            )
-        results.append(result)
 
-    # 3. render the query results
-    catalog_renderers = []
-    for provider, result in zip(providers, results):
-        try:
-            renderer = add_catalog_figure_elements(provider, result, tpf, fig_tpf, message_selected_target, arrow_4_selected)
-        except Exception as err:
-            renderer = fig_tpf.scatter()  # a dummy renderer
-            err_str = f"{type(err).__name__}:  {err}\n" + "".join(traceback.format_exc())
-            warnings.warn(
-                (
-                    f"Error while rendering data from {provider.label}. Its data will not be in the plot. "
-                    f"The error: {err_str}"
-                ),
-                LightkurveWarning,
-            )
+    # 3. create functions that will plot the results
+    #   (so that the caller can invoke them after main plot is done, to make output shown progressively)
+    def create_catalog_plot_fn(provider, result_task):
 
-        catalog_renderers.append(renderer)
-    return providers, catalog_renderers
+        # Make async update works using a pattern derived from:
+        # https://docs.bokeh.org/en/latest/docs/user_guide/server/app.html#updating-from-unlocked-callbacks
+
+        async def do_catalog_init_locked(result):
+            try:
+                renderer = add_catalog_figure_elements(
+                    provider, result, tpf, fig_tpf, ui_ctr, message_selected_target, arrow_4_selected
+                )
+            except Exception as err:
+                renderer = fig_tpf.scatter()  # a dummy renderer
+                err_str = f"{type(err).__name__}:  {err}\n" + "".join(traceback.format_exc())
+                warnings.warn(
+                    (
+                        f"Error while rendering data from {provider.label}. Its data will not be in the plot. "
+                        f"The error: {err_str}"
+                    ),
+                    LightkurveWarning,
+                )
+            renderer.name = f"catalog_{provider.label}"  # name the renderer so that they can be located later on.
+            return renderer
+
+        @without_document_lock
+        async def do_catalog_init_unlocked():
+            try:
+                result = await result_task
+            except Exception as err:
+                # ensure the error from a provider would not stop the whole plot,
+                # e.g., if an user plots with Gaia and ZTF data, if ZTF times out,
+                # the user would still see Gaia data
+                result = None
+                # user format_exc() instead of format_exception(err) to avoid
+                # format_exception() signature change in Python 3.10
+                err_str = f"{type(err).__name__}: {err}\n" + "".join(traceback.format_exc())
+                warnings.warn(
+                    (
+                        f"Error while getting data from {provider.label}. Its data will not be in the plot. "
+                        f"The error: {err_str}"
+                    ),
+                    LightkurveWarning,
+                )
+            doc.add_next_tick_callback(partial(do_catalog_init_locked, result=result))
+
+        return do_catalog_init_unlocked
+
+    catalog_plot_fns = [create_catalog_plot_fn(p, t) for p, t in zip(providers, result_tasks)]
+
+    return providers, catalog_plot_fns
 
 
 def to_selected_pixels_source(tpf_source):
@@ -1300,11 +1326,12 @@ def show_interact_widget(
         raise ValueError(f"Unsupported return_type : {return_type}")
 
 
-def _create_select_catalog_ui(providers, catalog_renderers):
+def _create_select_catalog_ui(providers, ui_ctr):
     select_catalog_ui = CheckboxGroup(
         labels=[p.label for p in providers],
-        active=list(range(0, len(providers))),  # make all checked
+        active=[],  # default not-checked, they'll be checked as the catalog data is rendered
         inline=True,
+        name="catalog_select_ctl",
     )
     # add more horizontal spacing between checkboxes
     select_catalog_ui.stylesheets = [
@@ -1319,12 +1346,13 @@ margin: 5px 10px;
 
     def select_catalog_handler(attr, old, new):
         # new is the list of indices of active (i.e., checked) catalogs
-        for i in range(len(catalog_renderers)):
-            r = catalog_renderers[i]
-            if i in new:
-                r.visible = True
-            else:
-                r.visible = False
+        for i, provider in enumerate(providers):
+            # locate the renderer of the correspond catalog
+            # Note: in edge cases, the renderer may not have yet been create,
+            # as they are created asynchronously
+            catalog_renderer = ui_ctr.select_one({"name": f"catalog_{provider.label}"})
+            if catalog_renderer is not None:
+                catalog_renderer.visible = i in new
 
     select_catalog_ui.on_change("active", select_catalog_handler)
 
@@ -1405,8 +1433,10 @@ def show_skyview_widget(tpf, notebook_url=None, aperture_mask="empty", catalogs=
 
     aperture_mask = tpf._parse_aperture_mask(aperture_mask)
 
-    async def async_create_interact_ui():
+    async def async_create_interact_ui(doc):
         tpf_source = prepare_tpf_datasource(tpf, aperture_mask)
+
+        ui_ctr = layout()  # the container for the whole skyview UI
 
         # The data source includes metadata for hover-over tooltips
 
@@ -1426,8 +1456,8 @@ def show_skyview_widget(tpf, notebook_url=None, aperture_mask="empty", catalogs=
 
         message_selected_target, arrow_4_selected = make_interact_sky_selection_elements(fig_tpf)
 
-        providers, catalog_renderers = await async_parse_and_add_catalogs_figure_elements(
-            catalogs, magnitude_limit, tpf, fig_tpf, message_selected_target, arrow_4_selected
+        providers, catalog_plot_fns = await async_parse_and_add_catalogs_figure_elements(
+            catalogs, magnitude_limit, tpf, doc, fig_tpf, ui_ctr, message_selected_target, arrow_4_selected
         )
 
         # Optionally override the default title
@@ -1446,28 +1476,33 @@ def show_skyview_widget(tpf, notebook_url=None, aperture_mask="empty", catalogs=
 
         # Layout all of the plots
         if len(catalogs) < 2:
-            widgets_and_figures = layout(
+            ui_ctr.children = [
                 Row(
                     Column(fig_tpf, stretch_slider),
                     message_selected_target,
                 )
-            )
+            ]
         else:
-            select_catalog_ui = _create_select_catalog_ui(providers, catalog_renderers)
-            widgets_and_figures = layout(
+            select_catalog_ui = _create_select_catalog_ui(providers, fig_tpf)
+            ui_ctr.children = [
                 Row(
                     Column(fig_tpf, select_catalog_ui, stretch_slider),
                     message_selected_target,
                 )
-            )
-        return widgets_and_figures
+            ]
+
+        return ui_ctr, catalog_plot_fns
 
     def create_interact_ui(doc):
         # bokeh-specific trick to use async codes to create the UI
         # (the naive asyncio.run() does not work in a bokeh server,
         #  as it has its own event loop.)
         async def do_create_ui():
-            doc.add_root(await async_create_interact_ui())
+            ui, catalog_plot_fns = await async_create_interact_ui(doc)
+            doc.add_root(ui)
+
+            for fn in catalog_plot_fns:
+                doc.add_timeout_callback(fn, 0)
 
         doc.add_next_tick_callback(do_create_ui)
 

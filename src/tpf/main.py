@@ -691,7 +691,7 @@ def create_app_ui_container():
     return ui_layout
 
 
-async def create_app_body_ui(tic, sector, magnitude_limit=None):
+async def create_app_body_ui(doc, tic, sector, magnitude_limit=None):
     # if True:  # for dev purpose only
     #     return column(create_lc_viewer_ui())
 
@@ -701,13 +701,16 @@ async def create_app_body_ui(tic, sector, magnitude_limit=None):
         sector = None if sector is None or sector == "" else int(sector)
         magnitude_limit = None if magnitude_limit is None or magnitude_limit == "" else float(magnitude_limit)
     except Exception as err:
-        return Div(text=f"<h3>Skyview</h3> Invalid Parameter. Error: {err}", name="skyview")
+        return Div(text=f"<h3>Skyview</h3> Invalid Parameter. Error: {err}", name="skyview"), None
 
     if tic is None:
-        return column(
-            Div(text="<h3>Skyview</h3>", name="skyview"),
-            Div(text="<h3>Pixels Inspection</h3>", name="tpf_interact_ctr"),
-            Div(text="<h3>Lightcurve</h3>", name="lc_viewer"),
+        return (
+            column(
+                Div(text="<h3>Skyview</h3>", name="skyview"),
+                Div(text="<h3>Pixels Inspection</h3>", name="tpf_interact_ctr"),
+                Div(text="<h3>Lightcurve</h3>", name="lc_viewer"),
+            ),
+            None,
         )
 
     if sector is not None:
@@ -719,11 +722,11 @@ async def create_app_body_ui(tic, sector, magnitude_limit=None):
 
     if tpf is None:
         log.debug(f"Cannot find TPF or TESSCut for {msg_label}. No plot to be made.")
-        return Div(text=f"<h3>SkyView</h3> Cannot find Pixel data for {msg_label}", name="skyview")
+        return Div(text=f"<h3>SkyView</h3> Cannot find Pixel data for {msg_label}", name="skyview"), None
 
     # set at info level, as it might be useful to gather statistics on the type of tpfs being plotted ()
     log.info(f"Plot Skyview: {tpf}, sector={tpf.meta.get('SECTOR')}, exptime={sr.exptime[-1]}, TessCut={is_tesscut(tpf)}")
-    return await create_app_body_ui_from_tpf(tpf, magnitude_limit=magnitude_limit)
+    return await create_app_body_ui_from_tpf(doc, tpf, magnitude_limit=magnitude_limit)
 
 
 def get_default_catalogs_from_env():
@@ -733,7 +736,7 @@ def get_default_catalogs_from_env():
     return [cat.strip() for cat in catalogs_str.split(",")]
 
 
-async def create_app_body_ui_from_tpf(tpf, magnitude_limit=None, catalogs=None):
+async def create_app_body_ui_from_tpf(doc, tpf, magnitude_limit=None, catalogs=None):
     if magnitude_limit is None:
         # supply default
         magnitude_limit = tpf.meta.get("TESSMAG", 0)
@@ -806,19 +809,24 @@ async def create_app_body_ui_from_tpf(tpf, magnitude_limit=None, catalogs=None):
             return_type="doc_init_fn",
         )
 
-        return column(
-            await create_skyview_ui(),
-            create_skyview_metadata_ui(
-                tpf,
-                ztf_search_radius=ztf_search_radius,
-                ztf_ngoodobsrel_min=ztf_ngoodobsrel_min,
-                skypatrol2_search_radius=skypatrol2_search_radius,
+        skyview_ui, catalog_plot_fns = await create_skyview_ui(doc)
+        # return the UI, and the catalog_plot_fns (for progressive plot of the catalog data asynchronously)
+        return (
+            column(
+                skyview_ui,
+                create_skyview_metadata_ui(
+                    tpf,
+                    ztf_search_radius=ztf_search_radius,
+                    ztf_ngoodobsrel_min=ztf_ngoodobsrel_min,
+                    skypatrol2_search_radius=skypatrol2_search_radius,
+                ),
+                create_tpf_interact_ui(tpf),
+                create_lc_viewer_ui(),
+                # the name is used to signify an interactive UI is returned
+                # (as opposed to the UI with a dummy UI or error message in the boundary conditions)
+                name="app_body_interactive",
             ),
-            create_tpf_interact_ui(tpf),
-            create_lc_viewer_ui(),
-            # the name is used to signify an interactive UI is returned
-            # (as opposed to the UI with a dummy UI or error message in the boundary conditions)
-            name="app_body_interactive",
+            catalog_plot_fns,
         )
 
 
@@ -841,6 +849,15 @@ Lost the connection to the server. You'd need to reload the page for some intera
     doc.js_on_event("connection_lost", js_connection_lost)
 
 
+def _progressive_plot_catalogs(doc, catalog_plot_fns):
+    # Use timeout to make the catalog data plot shown progressively
+    # by running them in the background.
+    if catalog_plot_fns is None:
+        return
+    for fn in catalog_plot_fns:
+        doc.add_timeout_callback(fn, 0)
+
+
 def show_app(tic, sector, magnitude_limit=None):
 
     async def create_app_ui(doc):
@@ -850,7 +867,7 @@ def show_app(tic, sector, magnitude_limit=None):
 
         ui_main = ui_ctr.select_one({"name": "app_main"})
         try:
-            ui_body = await create_app_body_ui(tic, sector, magnitude_limit=magnitude_limit)
+            ui_body, catalog_plot_fns = await create_app_body_ui(doc, tic, sector, magnitude_limit=magnitude_limit)
         except Exception as e:
             if isinstance(e, IOError):
                 # usually some issues in network or MAST server, nothing can be done on our end
@@ -870,9 +887,11 @@ def show_app(tic, sector, magnitude_limit=None):
                 )
                 err_msg = f"Error in creating Inspector. {type(e).__name__}: {e}"
             ui_body = Div(text=err_msg)
+            catalog_plot_fns = None
 
         ui_main.children = [ui_body]
         doc.add_root(ui_ctr)
+        _progressive_plot_catalogs(doc, catalog_plot_fns)
         if ui_body.name == "app_body_interactive":
             # the UI for monitoring WebSocket connection is only relevant
             # in the normal case that interactive widgets are to be shown.
@@ -883,6 +902,10 @@ def show_app(tic, sector, magnitude_limit=None):
     #
     doc = curdoc()
     doc.add_next_tick_callback(lambda: create_app_ui(doc))
+
+
+# BEGIN Jupyter notebook helpers, not used by the web app
+#
 
 
 def show_in_notebook(ui, notebook_url="localhost:8888"):
@@ -896,11 +919,38 @@ def show_in_notebook(ui, notebook_url="localhost:8888"):
     from bokeh.io import show, output_notebook
 
     def do_show(doc):
-        doc.add_root(ui)
+        if callable(ui):  # case actually a function
+            ui(doc)
+        else:
+            doc.add_root(ui)
 
     output_notebook(verbose=False, hide_banner=True)
     return show(do_show, notebook_url=notebook_url)
 
+
+def show_in_notebook_app_body_ui_from_tpf(tpf, magnitude_limit=None, catalogs=None, notebook_url="localhost:8888"):
+    """Helper for use in Jupyter notebook to show `create_app_body_ui_from_tpf()`."""
+
+    def create_app_body_ui_from_tpf_wrapper(doc):
+        async def do_create():
+            ui, catalog_plot_fns = await create_app_body_ui_from_tpf(
+                doc, tpf, catalogs=catalogs, magnitude_limit=magnitude_limit
+            )
+            doc.add_root(ui)
+            _progressive_plot_catalogs(doc, catalog_plot_fns)
+
+        doc.add_next_tick_callback(do_create)
+
+    return show_in_notebook(create_app_body_ui_from_tpf_wrapper, notebook_url=notebook_url)
+
+
+#
+# END   Jupyter notebook helpers, not used by the web app
+
+
+#
+# Webapp entry Point logic
+#
 
 def get_arg_as_int(args, arg_name, default_val=None):
     try:
@@ -918,9 +968,6 @@ def get_arg_as_float(args, arg_name, default_val=None):
     return val
 
 
-#
-# Entry Point logic
-#
 if __name__.startswith("bokeh_app_"):  # invoked from `bokeh serve`
     set_log_level_from_env()
     set_log_timed_from_env()

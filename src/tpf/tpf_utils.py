@@ -4,7 +4,7 @@ import warnings
 
 from retry import retry
 
-
+from astropy.table import Table
 import astropy.units as u
 import numpy as np
 
@@ -35,6 +35,39 @@ def search_targetpixelfile(*args, **kwargs):
 @retry(IOError, tries=LK_SEARCH_NUM_RETRIES, delay=0.5, backoff=2, jitter=(0, 0.5), logger=log)
 def search_tesscut(*args, **kwargs):
     return lk.search_tesscut(*args, **kwargs)
+
+
+def fast_search_tesscut(target, sector):
+    """Return a `SearchResult` for TessCut for a given target / sector quickly,
+    bypassing querying MAST.
+    This function assumes the target (typically a TIC) and sector are valid.
+    """
+    if target is None:
+        raise ValueError("fast_search_tesscut(): parameter tic must not be None.")
+
+    # sector gets validated in get_exptime()
+
+    def get_exptime(sector):
+        if not isinstance(sector, int):
+            raise ValueError("fast_search_tesscut(): parameter sector must be int.")
+        if sector < 1:
+            raise ValueError("fast_search_tesscut(): invalid sector: {sector}.")
+        if sector < 27:
+            return 1426  # 30-min cadence in cycles 1 - 2
+        if sector < 56:
+            return 475  # 10-min cadence in cycles 3 - 4
+        return 158  # 200-sec cadence in cycles 5+
+
+    exptime = get_exptime(sector)
+    # sector time, it's not really used in the use case
+    # so I just hardcode a time that it earlier than TESS mission (~ year 1995) to signify it's a dummy value
+    t_min = 50000
+
+    tab_str = f"""\
+    description,mission,target_name,targetid,t_min,exptime,productFilename,provenance_name,author,distance,sequence_number,project,obs_collection
+    TESS FFI Cutout(sector {sector}),TESS Sector {sector:02d},{target},{target},{t_min},{exptime},TESSCut,TESSCut,TESSCut,0.0,{sector},TESS,TESS"""  # noqa: E501
+
+    return lk.SearchResult(Table.read(tab_str, format="ascii.csv"))
 
 
 @timed()
@@ -92,15 +125,24 @@ async def _do_get_tpf(tic, sector, msg_label):
 
     @timed()
     def do_search_tesscut():
-        # TODO: query tesspoint to avoid returning sectors where the target is not on science pixels
-        # e.g, TIC 160193537, sector 74, TessCut can return a TPF but the target is not on science pixels
         sr = search_tesscut(f"TIC{tic}", sector=sector)
+        return sr
+
+    @timed()
+    def do_fast_search_tesscut():
+        # timing it is somewhat useless as it's almost instantaneous
+        # but it makes the timing log more uniform.
+        sr = fast_search_tesscut(f"TIC{tic}", sector=sector)
         return sr
 
     # Search TPF and TessCut in parallel, to speed up for cases for TessCut is to be used
     # at the expanse of extra TessCut search for cases TPF is to be used
     sr_tpf_task = _create_background_task(do_search_tpf)
-    sr_tc_task = _create_background_task(do_search_tesscut)
+    if sector is not None:
+        # case sector specified, bypass querying MAST to speed things up.
+        sr_tc_task = _create_background_task(do_fast_search_tesscut)
+    else:
+        sr_tc_task = _create_background_task(do_search_tesscut)
 
     sr = await sr_tpf_task
     if len(sr) > 0:
