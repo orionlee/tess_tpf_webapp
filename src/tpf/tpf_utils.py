@@ -162,8 +162,27 @@ async def _do_get_tpf(tic, sector, msg_label, download_kwargs=None):
     if len(sr) > 0:
         # case downloading a TessCut
         log.debug(f"No TPF found for {msg_label}. Use TessCut.")
-        tpf = _do_download_tesscut(sr, download_kwargs)
-        return tpf, sr
+        try:
+            tpf = _do_download_tesscut(sr, download_kwargs)
+            return tpf, sr
+        except lk.search.SearchError as e:
+            if "index 0 is out of bounds" in str(e):
+                # special case the error is likely because there is no TessCut in the specified sector.
+                #
+                # root cause: the shortcut do_fast_search_tesscut() will return SearchResult
+                # object for the given sector even if there is no data.
+                # When download is attempted, it would fail with an IndexError
+                # in SearchResult._fetch_tesscut_path(), line:
+                #    sector_name = sec[sec["sector"] == sector]["sectorName"][0]
+                # The `IndexError: index 0 is out of bounds for axis 0 with size 0`
+                # is then wrapped as a SearchError.
+                #
+                # Here we try to catch this special case, and treat it as no TPF found,
+                # which also reduces log pollution.
+                log.debug(f"TPF likely not found for {msg_label} in  TessCut either. {e}")
+                return None, None
+            else:
+                raise e
 
     # case no TPF nor TessCut
     return None, None
