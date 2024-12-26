@@ -383,7 +383,7 @@ def export_plt_fig_as_data_uri(fig, close_fig=True):
     return uri
 
 
-def create_tpf_interact_ui(tpf, hide_save_to_local_btn=True):
+def create_tpf_interact_ui(tpf, fig_tpf_skyview=None, hide_save_to_local_btn=True):
     btn_inspect = Button(label="Inspect", button_type="primary")
     btn_help_inspect = HelpButton(
         tooltip=Tooltip(
@@ -505,6 +505,12 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
             fig_lc.toolbar.active_drag = box_zoom_tools[0] if len(box_zoom_tools) > 0 else "auto"
         except Exception as e:
             warnings.warn(f"Failed to enable box zoom as default for tpf.interact() LC viewer. {e}")
+
+        # use the x/y zoom range of the SkyView TPF as the default, if available
+        if fig_tpf_skyview is not None:
+            fig_tpf = ui_body.select_one({"name": "fig_tpf"})
+            fig_tpf.x_range = fig_tpf_skyview.x_range.clone()
+            fig_tpf.y_range = fig_tpf_skyview.y_range.clone()
 
         # hide "Save lightcurve" button (not applicable in Web UI)
         # OPEN: we might present a new button to let users download the LC from the webapp
@@ -846,7 +852,7 @@ async def create_app_body_ui_from_tpf(doc, tpf, magnitude_limit=None, catalogs=N
                     ztf_ngoodobsrel_min=ztf_ngoodobsrel_min,
                     skypatrol2_search_radius=skypatrol2_search_radius,
                 ),
-                create_tpf_interact_ui(tpf),
+                create_tpf_interact_ui(tpf, fig_tpf_skyview=skyview_ui.select_one({"name": "fig_tpf_skyview"})),
                 create_lc_viewer_ui(),
                 # the name is used to signify an interactive UI is returned
                 # (as opposed to the UI with a dummy UI or error message in the boundary conditions)

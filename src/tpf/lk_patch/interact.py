@@ -1469,6 +1469,7 @@ def show_skyview_widget(tpf, notebook_url=None, aperture_mask="empty", catalogs=
             width=640,
             height=600,
             tools="tap,box_zoom,wheel_zoom,reset",
+            fig_name="fig_tpf_skyview",
         )
 
         # Add a marker (cross) to indicate the coordinate of the target
