@@ -687,6 +687,8 @@ def _create_background_task(func, *args, **kwargs):
 async def async_parse_and_add_catalogs_figure_elements(
     catalogs, magnitude_limit, tpf, doc, fig_tpf, ui_ctr, message_selected_target, arrow_4_selected
 ):
+    tpf_label = f"TIC {tpf.meta.get('TICID')}, sector {tpf.meta.get('SECTOR')}"
+
     # 1. create provider instances from catalog specifications
     providers = []
     for catalog_spec in catalogs:
@@ -726,7 +728,9 @@ async def async_parse_and_add_catalogs_figure_elements(
         # https://docs.bokeh.org/en/latest/docs/user_guide/server/app.html#updating-from-unlocked-callbacks
 
         async def do_catalog_init_locked(result):
-            log.debug(f"do_catalog_init_locked() for {provider.label}: {len(result) if result is not None else None}")
+            log.debug(
+                f"do_catalog_init_locked() for {tpf_label} - {provider.label}: {len(result) if result is not None else None}"
+            )
             try:
                 renderer = add_catalog_figure_elements(
                     provider, result, tpf, fig_tpf, ui_ctr, message_selected_target, arrow_4_selected
@@ -778,7 +782,7 @@ async def async_parse_and_add_catalogs_figure_elements(
                     ),
                     LightkurveWarning,
                 )
-            log.debug(f"Scheduling do_catalog_init_locked() for {provider.label}.")
+            log.debug(f"Scheduling do_catalog_init_locked() for {tpf_label} - {provider.label}.")
             doc.add_next_tick_callback(partial(do_catalog_init_locked, result=result))
 
         return do_catalog_init_unlocked
