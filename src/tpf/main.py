@@ -445,10 +445,33 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
                 lc = lc - get_bkg_per_pixel_lc() * lc.meta["APERTURE_MASK"].sum()
             return lc.normalize() if in_flux_normalized.active else lc
 
+        # a reference to the Lc plot to be created below, used by ylim_func()
+        fig_lc = None
+
         def ylim_func(lc):
+            # note: if `fig_lc` has been created,
+            # use it to restrict the x-range of the LC
+            # so that when one zooms in, it'll automatically scale
+            # the y-range to the date range specified,
+            # avoiding cases that extreme outliers (e.g.,) scattered light
+            # continue to affect the default y-range once zoomed in
+            if fig_lc is not None:
+                lc_trunc = lc.truncate(fig_lc.x_range.start, fig_lc.x_range.end)
+                if len(lc_trunc) > 0:
+                    lc = lc_trunc
+
+            # default ymin / ymax based on the range of flux in the LC (possibly zoomed in),
+            # padding with some extra spacing
+            ymin = np.nanmin(lc.flux).value
+            ymax = np.nanmax(lc.flux).value
+            ymax += np.abs(ymax - ymin) * 0.1
+            ymin -= np.abs(ymax - ymin) * 0.1
+
+            # override ymin / ymax if user specifies explicit values
+            ymin = get_value_in_float(in_ymin, ymin)
+            ymax = get_value_in_float(in_ymax, ymax)
+
             unit = lc.flux.unit
-            ymin = get_value_in_float(in_ymin, np.nanmin(lc.flux).value)
-            ymax = get_value_in_float(in_ymax, np.nanmax(lc.flux).value)
             return (ymin * unit, ymax * unit)
 
         # for TessCut, set the initial aperture mask to be the single pixel where the target is located
@@ -462,7 +485,7 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
         #     reflected when users changes the LC by selecting different pixels
         #     (without the need to click inspect button again)
 
-        create_tpf_interact_ui, interact_mask = show_interact_widget(
+        create_tpf_interact_ui_func, interact_mask = show_interact_widget(
             tpf,
             ylim_func=ylim_func,
             transform_func=transform_func,
@@ -471,11 +494,12 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
             also_return_selection_mask=True,
         )
 
-        ui_body = await create_tpf_interact_ui()
+        ui_body = await create_tpf_interact_ui_func()
         ui_body.name = "tpf_interact_fig"
 
         # enable box_zoom_tool by default
         try:
+            # fig_lc is also used by ylim_func above
             fig_lc = ui_body.children[0].children[0]  # hack: assuming the widgets layout returned by show_interact_widget()
             box_zoom_tools = [t for t in fig_lc.toolbar.tools if isinstance(t, bokeh.models.BoxZoomTool)]
             fig_lc.toolbar.active_drag = box_zoom_tools[0] if len(box_zoom_tools) > 0 else "auto"
