@@ -300,7 +300,7 @@ def get_lightcurve_y_limits(lc_source):
     return low - margin, high + margin
 
 
-def make_lightcurve_figure_elements(lc, lc_source, ylim_func=None):
+def make_lightcurve_figure_elements(lc, lc_source, ylim_func=None, fig_name="fig_lc"):
     """Make the lightcurve figure elements.
 
     Parameters
@@ -333,6 +333,7 @@ def make_lightcurve_figure_elements(lc, lc_source, ylim_func=None):
         tools="pan,wheel_zoom,box_zoom,tap,reset",
         toolbar_location="below",
         border_fill_color="whitesmoke",
+        name=fig_name,
     )
     fig.title.offset = -10
 

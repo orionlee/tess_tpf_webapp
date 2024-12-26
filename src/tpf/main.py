@@ -500,7 +500,7 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
         # enable box_zoom_tool by default
         try:
             # fig_lc is also used by ylim_func above
-            fig_lc = ui_body.children[0].children[0]  # hack: assuming the widgets layout returned by show_interact_widget()
+            fig_lc = ui_body.select_one({"name": "fig_lc"})
             box_zoom_tools = [t for t in fig_lc.toolbar.tools if isinstance(t, bokeh.models.BoxZoomTool)]
             fig_lc.toolbar.active_drag = box_zoom_tools[0] if len(box_zoom_tools) > 0 else "auto"
         except Exception as e:
