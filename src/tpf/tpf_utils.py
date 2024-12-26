@@ -71,16 +71,23 @@ def fast_search_tesscut(target, sector):
 
 
 @timed()
-def _do_download_spoc_tpf(sr):
-    return sr[-1].download()
+def _do_download_spoc_tpf(sr, download_kwargs=None):
+    if download_kwargs is None:
+        download_kwargs = dict()
+    return sr[-1].download(**download_kwargs)
 
 
 @timed()
-def _do_download_tesscut(sr):
-    cutout_size = (11, 11)  # OPEN: would be too small for bright stars
-    # TODO: query TIC catalog to backfill proper motion / TESSMAG
+def _do_download_tesscut(sr, download_kwargs=None):
+    # TODO: query TIC catalog to backfill proper motion / TESSMAG (or use patched lk.search)
     # (used by the webapp)
-    tpf = sr[-1].download(cutout_size=cutout_size)
+    if download_kwargs is None:
+        download_kwargs = dict()
+    if download_kwargs.get("cutout_size", None) is None:
+        download_kwargs = download_kwargs.copy()
+        download_kwargs["cutout_size"] = (11, 11)  # OPEN: would be too small for bright stars
+
+    tpf = sr[-1].download(**download_kwargs)
 
     try:
         # tweaks to make it look like SPOC-produced TPF
@@ -94,7 +101,7 @@ def _do_download_tesscut(sr):
     return tpf
 
 
-async def get_tpf(tic, sector, msg_label):
+async def get_tpf(tic, sector, msg_label, download_kwargs=None):
     # suppress the unnecessary logging error messages "No data found for target ..." from search
     # they just pollute the log output in an webapp environment
     search_log = lk.search.log
@@ -107,12 +114,12 @@ async def get_tpf(tic, sector, msg_label):
 
     search_log.error = error_ignore_no_data
     try:
-        return await _do_get_tpf(tic, sector, msg_label)
+        return await _do_get_tpf(tic, sector, msg_label, download_kwargs)
     finally:
         search_log.error = error_original
 
 
-async def _do_get_tpf(tic, sector, msg_label):
+async def _do_get_tpf(tic, sector, msg_label, download_kwargs=None):
 
     @timed()
     def do_search_tpf():
@@ -148,15 +155,34 @@ async def _do_get_tpf(tic, sector, msg_label):
     if len(sr) > 0:
         # case downloading a TPF
         sr_tc_task.cancel()  # no longer needed
-        tpf = _do_download_spoc_tpf(sr)
+        tpf = _do_download_spoc_tpf(sr, download_kwargs)
         return tpf, sr
 
     sr = await sr_tc_task
     if len(sr) > 0:
         # case downloading a TessCut
         log.debug(f"No TPF found for {msg_label}. Use TessCut.")
-        tpf = _do_download_tesscut(sr)
-        return tpf, sr
+        try:
+            tpf = _do_download_tesscut(sr, download_kwargs)
+            return tpf, sr
+        except lk.search.SearchError as e:
+            if "index 0 is out of bounds" in str(e):
+                # special case the error is likely because there is no TessCut in the specified sector.
+                #
+                # root cause: the shortcut do_fast_search_tesscut() will return SearchResult
+                # object for the given sector even if there is no data.
+                # When download is attempted, it would fail with an IndexError
+                # in SearchResult._fetch_tesscut_path(), line:
+                #    sector_name = sec[sec["sector"] == sector]["sectorName"][0]
+                # The `IndexError: index 0 is out of bounds for axis 0 with size 0`
+                # is then wrapped as a SearchError.
+                #
+                # Here we try to catch this special case, and treat it as no TPF found,
+                # which also reduces log pollution.
+                log.debug(f"TPF likely not found for {msg_label} in  TessCut either. {e}")
+                return None, None
+            else:
+                raise e
 
     # case no TPF nor TessCut
     return None, None

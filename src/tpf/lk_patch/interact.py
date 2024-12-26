@@ -300,7 +300,7 @@ def get_lightcurve_y_limits(lc_source):
     return low - margin, high + margin
 
 
-def make_lightcurve_figure_elements(lc, lc_source, ylim_func=None):
+def make_lightcurve_figure_elements(lc, lc_source, ylim_func=None, fig_name="fig_lc"):
     """Make the lightcurve figure elements.
 
     Parameters
@@ -333,6 +333,7 @@ def make_lightcurve_figure_elements(lc, lc_source, ylim_func=None):
         tools="pan,wheel_zoom,box_zoom,tap,reset",
         toolbar_location="below",
         border_fill_color="whitesmoke",
+        name=fig_name,
     )
     fig.title.offset = -10
 
@@ -686,6 +687,8 @@ def _create_background_task(func, *args, **kwargs):
 async def async_parse_and_add_catalogs_figure_elements(
     catalogs, magnitude_limit, tpf, doc, fig_tpf, ui_ctr, message_selected_target, arrow_4_selected
 ):
+    tpf_label = f"TIC {tpf.meta.get('TICID')}, sector {tpf.meta.get('SECTOR')}"
+
     # 1. create provider instances from catalog specifications
     providers = []
     for catalog_spec in catalogs:
@@ -725,7 +728,9 @@ async def async_parse_and_add_catalogs_figure_elements(
         # https://docs.bokeh.org/en/latest/docs/user_guide/server/app.html#updating-from-unlocked-callbacks
 
         async def do_catalog_init_locked(result):
-            log.debug(f"do_catalog_init_locked() for {provider.label}: {len(result) if result is not None else None}")
+            log.debug(
+                f"do_catalog_init_locked() for {tpf_label} - {provider.label}: {len(result) if result is not None else None}"
+            )
             try:
                 renderer = add_catalog_figure_elements(
                     provider, result, tpf, fig_tpf, ui_ctr, message_selected_target, arrow_4_selected
@@ -777,7 +782,7 @@ async def async_parse_and_add_catalogs_figure_elements(
                     ),
                     LightkurveWarning,
                 )
-            log.debug(f"Scheduling do_catalog_init_locked() for {provider.label}.")
+            log.debug(f"Scheduling do_catalog_init_locked() for {tpf_label} - {provider.label}.")
             doc.add_next_tick_callback(partial(do_catalog_init_locked, result=result))
 
         return do_catalog_init_unlocked
@@ -1469,6 +1474,7 @@ def show_skyview_widget(tpf, notebook_url=None, aperture_mask="empty", catalogs=
             width=640,
             height=600,
             tools="tap,box_zoom,wheel_zoom,reset",
+            fig_name="fig_tpf_skyview",
         )
 
         # Add a marker (cross) to indicate the coordinate of the target
