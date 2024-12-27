@@ -3,6 +3,8 @@
 base=`dirname $0`
 dest=$base/../../../build/tess-tpf
 
+set -e
+
 # the commit SHA
 # - in gcloud continuous deployment env, it will be supplied as a parameter
 #   (git not available in gcloud's bash build step)
@@ -12,8 +14,6 @@ if [ "$commit_sha" == "" ]; then
   commit_sha=`git rev-parse HEAD`
   echo To save commit SHA in build: $commit_sha
 fi
-
-set -e
 
 # first clean the destination dir to ensure a clean build
 if [ -d "$dest" ]; then
