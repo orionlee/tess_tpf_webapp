@@ -5,10 +5,11 @@ steps:
   # First assemble the sources and artifacts at ./build/tess-tpf
   # the script somehow lost the x attribute after copied to gcloud build,
   # so we have to re-add it.
+  # Pass git commit SHA to assemble.sh so that it can be saved in the build.
   - name: 'bash'
     script: chmod a+x ./src/tpf/gcloud/assemble.sh
   - name: 'bash'
-    args: ['./src/tpf/gcloud/assemble.sh']
+    script: ./src/tpf/gcloud/assemble.sh $COMMIT_SHA
 
   # The rest is based on gcloud continuous deployment's default config,
   # except the build base dir is ./build/tess-tpf instead of .
