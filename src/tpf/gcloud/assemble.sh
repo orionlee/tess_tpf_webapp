@@ -26,6 +26,9 @@ cp --update --archive  $base/.*  $dest
 # as it would be picked up by "gcloud run deploy --source .", and would create bad builds.
 rm -f $dest/cloudbuild.yaml
 
+# save commit SHA to be displayed in the UI.
+git rev-parse HEAD > $dest/tpf/build.txt
+
 ls -l $dest/ $dest/tpf
 
 echo
