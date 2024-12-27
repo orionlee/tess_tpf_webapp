@@ -85,6 +85,26 @@ def get_value_in_float(input: TextInput, default=None):
     return val
 
 
+@cache
+def get_build_sha():
+    from pathlib import Path
+
+    build_fname = Path(__file__).parent / "build.txt"
+    try:
+        with build_fname.open() as f:
+            return f.readline().strip()
+    except FileNotFoundError:
+        # in dev mode from source, build.txt is not generated
+        return ""
+    except Exception as e:
+        log.error(f"get_build_sha(): Unexpected error, return empty string. {e}")
+        return ""
+
+
+def get_build_sha_short():
+    return get_build_sha()[:8]
+
+
 @lru_cache(20)  # in a single session, users generally will inspect a handful of LCs at most.
 def _do_read_lc(url):
     """A wrapper of `read_lc()` that supports caching of lightcurves, so that
@@ -693,6 +713,9 @@ def create_search_form(tic, sector, magnitude_limit):
     </form>
 </div>
 <footer>
+    Build:
+    <a target="_blank" href="https://github.com/orionlee/tess_tpf_webapp/commit/{get_build_sha()}"
+        >{get_build_sha_short()}</a><br>
     <a href="https://github.com/orionlee/tess_tpf_webapp" target="_blank">Issues / Sources</a>
     <details>
         <summary>Data sources</summary>
