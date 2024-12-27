@@ -10,6 +10,7 @@ steps:
     script: chmod a+x ./src/tpf/gcloud/assemble.sh
   - name: 'bash'
     script: ./src/tpf/gcloud/assemble.sh $COMMIT_SHA
+    automapSubstitutions: true
 
   # The rest is based on gcloud continuous deployment's default config,
   # except the build base dir is ./build/tess-tpf instead of .
