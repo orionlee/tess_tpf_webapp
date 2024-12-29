@@ -101,7 +101,7 @@ def _do_download_tesscut(sr, download_kwargs=None):
     return tpf
 
 
-async def get_tpf(tic, sector, msg_label, download_kwargs=None):
+async def get_tpf(tic, sector, msg_label, search_kwargs=None, download_kwargs=None):
     # suppress the unnecessary logging error messages "No data found for target ..." from search
     # they just pollute the log output in an webapp environment
     search_log = lk.search.log
@@ -114,19 +114,24 @@ async def get_tpf(tic, sector, msg_label, download_kwargs=None):
 
     search_log.error = error_ignore_no_data
     try:
-        return await _do_get_tpf(tic, sector, msg_label, download_kwargs)
+        return await _do_get_tpf(tic, sector, msg_label, search_kwargs=search_kwargs, download_kwargs=download_kwargs)
     finally:
         search_log.error = error_original
 
 
-async def _do_get_tpf(tic, sector, msg_label, download_kwargs=None):
+async def _do_get_tpf(tic, sector, msg_label, search_kwargs=None, download_kwargs=None):
 
     @timed()
     def do_search_tpf():
-        sr = search_targetpixelfile(f"TIC{tic}", mission="TESS", sector=sector)
-        if len(sr) > 1:
-            # exclude fast cadence data (20s), TPFs with fast cadence always has 2 min cadence counterparts
+        search_kwargs_actual = search_kwargs if search_kwargs is not None else dict()
+
+        sr = search_targetpixelfile(f"TIC{tic}", mission="TESS", sector=sector, **search_kwargs_actual)
+        if len(sr) > 1 and len(search_kwargs_actual) < 1:
+            # by default, exclude fast cadence data (20s), TPFs with fast cadence always has 2 min cadence counterparts
             # for the use case here, the fast cadence data is irrelevant. It'd just make the processing slower.
+            #
+            # if user specifies `search_kwargs`, no default exclusion is done,
+            # to allow users to get fast cadence data, e.g., by specifying exptime
             sr = sr[sr.exptime > 60 * u.s]
         return sr
 
