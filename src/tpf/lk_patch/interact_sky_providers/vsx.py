@@ -184,6 +184,7 @@ def _parse_response(result):
 
 
 # VSX API documentation: https://www.aavso.org/apis-aavso-resources#:~:text=The%20VSX%20API%20is%20not%20%22official%22%20yet
+# VSX hostname change in Jan 2025: https://github.com/AAVSO/VStar/issues/458
 # See also VSX in Vizier : https://vizier.cds.unistra.fr/viz-bin/VizieR-3?-source=B/vsx/vsx
 @lru_cache
 def _query_cone_region(ra2000, dec2000, radius_deg, magnitude_limit=None):
@@ -191,7 +192,7 @@ def _query_cone_region(ra2000, dec2000, radius_deg, magnitude_limit=None):
     The result is formatted to be compatible with Vizier in VSX (`B/vsx/vsx`) to the extent possible.
     """
 
-    query_url = f"https://www.aavso.org/vsx/index.php?view=api.list&ra={ra2000}&dec={dec2000}&radius={radius_deg}&format=json"
+    query_url = f"https://vsx.aavso.org/index.php?view=api.list&ra={ra2000}&dec={dec2000}&radius={radius_deg}&format=json"
     if magnitude_limit is not None:
         query_url += f"&tomag={magnitude_limit}"
 
@@ -344,7 +345,7 @@ class VSXInteractSkyCatalogProvider(InteractSkyCatalogProvider):
         ]
 
     def get_detail_view(self, data: dict) -> Tuple[dict, list]:
-        vsx_url = f"https://www.aavso.org/vsx/index.php?view=detail.top&oid={data['OID']}"
+        vsx_url = f"https://vsx.aavso.org/index.php?view=detail.top&oid={data['OID']}"
         if np.isnan(data["Epoch"]):
             epoch_text = ""
         else:
