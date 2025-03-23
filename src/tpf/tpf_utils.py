@@ -101,7 +101,7 @@ def _do_download_tesscut(sr, download_kwargs=None):
     return tpf
 
 
-async def get_tpf(tic, sector, msg_label, download_kwargs=None):
+async def get_tpf(tic, sector, msg_label, search_sources=None, search_kwargs=None, download_kwargs=None):
     # suppress the unnecessary logging error messages "No data found for target ..." from search
     # they just pollute the log output in an webapp environment
     search_log = lk.search.log
@@ -114,24 +114,46 @@ async def get_tpf(tic, sector, msg_label, download_kwargs=None):
 
     search_log.error = error_ignore_no_data
     try:
-        return await _do_get_tpf(tic, sector, msg_label, download_kwargs)
+        return await _do_get_tpf(
+            tic, sector, msg_label, search_sources=search_sources, search_kwargs=search_kwargs, download_kwargs=download_kwargs
+        )
     finally:
         search_log.error = error_original
 
 
-async def _do_get_tpf(tic, sector, msg_label, download_kwargs=None):
+async def _do_get_tpf(tic, sector, msg_label, search_sources=None, search_kwargs=None, download_kwargs=None):
+    if search_sources is None or search_sources == "all":
+        to_search_tpf, to_search_tesscut = True, True
+    elif search_sources == "tpf":
+        to_search_tpf, to_search_tesscut = True, False
+    elif search_sources == "tesscut":
+        to_search_tpf, to_search_tesscut = False, True
+    else:
+        raise ValueError(f"Invalid search_sources: {search_sources}")
 
     @timed()
     def do_search_tpf():
-        sr = search_targetpixelfile(f"TIC{tic}", mission="TESS", sector=sector)
-        if len(sr) > 1:
-            # exclude fast cadence data (20s), TPFs with fast cadence always has 2 min cadence counterparts
+        if not to_search_tpf:
+            log.debug("do_search_tpf() skipped due to user override")
+            return lk.SearchResult()
+
+        search_kwargs_actual = search_kwargs if search_kwargs is not None else dict()
+
+        sr = search_targetpixelfile(f"TIC{tic}", mission="TESS", sector=sector, **search_kwargs_actual)
+        if len(sr) > 1 and len(search_kwargs_actual) < 1:
+            # by default, exclude fast cadence data (20s), TPFs with fast cadence always has 2 min cadence counterparts
             # for the use case here, the fast cadence data is irrelevant. It'd just make the processing slower.
+            #
+            # if user specifies `search_kwargs`, no default exclusion is done,
+            # to allow users to get fast cadence data, e.g., by specifying exptime
             sr = sr[sr.exptime > 60 * u.s]
         return sr
 
     @timed()
     def do_search_tesscut():
+        if not to_search_tesscut:
+            log.debug("do_search_tesscut() skipped due to user override")
+            return lk.SearchResult()
         sr = search_tesscut(f"TIC{tic}", sector=sector)
         return sr
 
@@ -139,6 +161,9 @@ async def _do_get_tpf(tic, sector, msg_label, download_kwargs=None):
     def do_fast_search_tesscut():
         # timing it is somewhat useless as it's almost instantaneous
         # but it makes the timing log more uniform.
+        if not to_search_tesscut:
+            log.debug("do_fast_search_tesscut() skipped due to user override")
+            return lk.SearchResult()
         sr = fast_search_tesscut(f"TIC{tic}", sector=sector)
         return sr
 
