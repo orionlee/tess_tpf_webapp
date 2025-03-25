@@ -84,7 +84,7 @@ class ZTFInteractSkyCatalogProvider(InteractSkyCatalogProvider):
         # query: ZTF-specific
         ngoodobsrel_min: int = 100,
         filtercode: str = None,
-        data_release: int = 22,
+        data_release: int = 23,
         # for ZTF LC URL
         lc_format: str = "csv",
         scatter_kwargs: dict = None,
