@@ -1195,10 +1195,12 @@ def show_interact_widget(
             value=np.min(tpf.cadenceno),
             step=1,
             title="Cadence Number",
-            width=490,
+            width=410,
         )
         r_button = Button(label=">", button_type="default", width=30)
         l_button = Button(label="<", button_type="default", width=30)
+        # show time of selected cadence, e.g., BTJD<br>1234.56
+        message_cadence = Div(text="", width=80, height=30)
         export_button = Button(label="Save Lightcurve", button_type="success", width=120)
         message_on_save = Div(text=" ", width=600, height=15)
 
@@ -1255,8 +1257,12 @@ def show_interact_widget(
                 frameno = tpf_index_lookup[new]
                 fig_tpf.select("tpfimg")[0].data_source.data["image"] = [tpf.flux.value[frameno, :, :] + pedestal]
                 vertical_line.update(location=tpf.time.value[frameno])
+                t = tpf.time[frameno]  # cadence's time
+                # e.g., BTJD<br>1234.56  ; assuming t.value is a number, rather than string
+                message_cadence.text = f"{t.format.upper()}<br>{t.value:.2f}"
             else:
                 fig_tpf.select("tpfimg")[0].data_source.data["image"] = [tpf.flux.value[0, :, :] * np.nan]
+                message_cadence.text = ""
             lc_source.selected.indices = []
 
         def go_right_by_one():
@@ -1323,7 +1329,7 @@ def show_interact_widget(
         )
         widgets_and_figures = layout(
             [fig_lc, fig_tpf],
-            [l_button, sp1, r_button, sp2, cadence_slider, sp3, stretch_slider],
+            [l_button, sp1, r_button, sp2, cadence_slider, message_cadence, sp3, stretch_slider],
             [export_button, sp4, message_on_save],
         )
         return widgets_and_figures
