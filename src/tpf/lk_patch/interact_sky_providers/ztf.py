@@ -181,9 +181,14 @@ class ZTFInteractSkyCatalogProvider(InteractSkyCatalogProvider):
         ]
 
     def get_detail_view(self, data: dict) -> Tuple[dict, list]:
-        ztf_url = _to_lc_url(data["oid"], self.data_release, self.lc_format)
+        ztf_url = _to_lc_url(data["oid"], self.data_release, self.lc_format)  # the csv data
+        sand_url = f"https://ztf.snad.space/view/{data['oid']}"  # a web viewer
+        oid_html = (
+            f"""{data['oid']} (<a href="{ztf_url}" title="csv data" target="_blank">LC</a>"""
+            f""",&emsp;<a href="{sand_url}" title="web viewer" target="_blank">sand</a>)"""
+        )
         return {
-            "ZTF OID": f"""{data['oid']} (<a href="{ztf_url}" target="_blank">LC</a>)""",
+            "ZTF OID": oid_html,
             'Separation (")': f"{data['separation']:.2f}",
             "filter": data["filtercode"],
             "num. good obs.": data["ngoodobsrel"],

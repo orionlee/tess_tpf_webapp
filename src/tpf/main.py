@@ -429,6 +429,10 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
     in_ymin = TextInput(width=100, placeholder="optional")
     in_ymax = TextInput(width=100, placeholder="optional")
 
+    centroid_link_html = f"""\
+&emsp;<a href="https://transit-vetting.streamlit.app/?tic={tpf.meta.get("TICID")}&sec={tpf.meta.get("SECTOR")}"
+   style="font-size: 120%;" title="Webapp to identify centroids" target="_blank">centroid analysis</a>
+"""
     ui_layout = column(
         Div(text="<hr>"),  # a spacer
         Div(text="<h3>Pixels Inspection</h3>"),
@@ -443,6 +447,7 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
             in_ymin,
             Div(text="y max."),
             in_ymax,
+            Div(text=centroid_link_html),
         ),
         name="tpf_interact_ctr",
     )
