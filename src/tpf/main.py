@@ -1018,7 +1018,6 @@ def show_in_notebook_app_body_ui_from_tpf(tpf, magnitude_limit=None, catalogs=No
 # Webapp entry Point logic
 #
 
-
 def get_arg_as_int(args, arg_name, default_val=None):
     try:
         val = int(args.get(arg_name)[0])
@@ -1038,6 +1037,12 @@ def get_arg_as_float(args, arg_name, default_val=None):
 if __name__.startswith("bokeh_app_"):  # invoked from `bokeh serve`
     set_log_level_from_env()
     set_log_timed_from_env()
+
+    # debug codes to ensure custom MAST timeout is applied
+    from astroquery.mast import Observations
+
+    log.debug(f"MAST Timeout: {Observations._portal_api_connection.TIMEOUT}")
+
     args = curdoc().session_context.request.arguments
     tic = get_arg_as_int(args, "tic", None)  # default value for sample
     sector = get_arg_as_int(args, "sector", None)
