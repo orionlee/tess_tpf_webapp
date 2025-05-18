@@ -510,6 +510,11 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
         #     reflected when users changes the LC by selecting different pixels
         #     (without the need to click inspect button again)
 
+        # a more friendly fits filename than the default, useful in notebook env
+        exported_filename = (
+            f'tess-tic{tpf.meta.get("TICID")}-s{tpf.meta.get("SECTOR", 0):04}'
+            f"-{tpf.flux.shape[1]}x{tpf.flux.shape[2]}_astrocut-custom-lc.fits"
+        )
         create_tpf_interact_ui_func, interact_mask = show_interact_widget(
             tpf,
             ylim_func=ylim_func,
@@ -517,6 +522,7 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
             aperture_mask=aperture_mask,
             return_type="doc_init_fn",
             also_return_selection_mask=True,
+            exported_filename=exported_filename,
         )
 
         ui_body = await create_tpf_interact_ui_func()
@@ -1011,6 +1017,7 @@ def show_in_notebook_app_body_ui_from_tpf(tpf, magnitude_limit=None, catalogs=No
 #
 # Webapp entry Point logic
 #
+
 
 def get_arg_as_int(args, arg_name, default_val=None):
     try:
