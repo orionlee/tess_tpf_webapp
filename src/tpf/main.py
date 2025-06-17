@@ -510,6 +510,11 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
         #     reflected when users changes the LC by selecting different pixels
         #     (without the need to click inspect button again)
 
+        # a more friendly fits filename than the default, useful in notebook env
+        exported_filename = (
+            f'tess-tic{tpf.meta.get("TICID")}-s{tpf.meta.get("SECTOR", 0):04}'
+            f"-{tpf.flux.shape[1]}x{tpf.flux.shape[2]}_astrocut-custom-lc.fits"
+        )
         create_tpf_interact_ui_func, interact_mask = show_interact_widget(
             tpf,
             ylim_func=ylim_func,
@@ -517,6 +522,7 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
             aperture_mask=aperture_mask,
             return_type="doc_init_fn",
             also_return_selection_mask=True,
+            exported_filename=exported_filename,
         )
 
         ui_body = await create_tpf_interact_ui_func()
@@ -1031,6 +1037,12 @@ def get_arg_as_float(args, arg_name, default_val=None):
 if __name__.startswith("bokeh_app_"):  # invoked from `bokeh serve`
     set_log_level_from_env()
     set_log_timed_from_env()
+
+    # debug codes to ensure custom MAST timeout is applied
+    from astroquery.mast import Observations
+
+    log.debug(f"MAST Timeout: {Observations._portal_api_connection.TIMEOUT}")
+
     args = curdoc().session_context.request.arguments
     tic = get_arg_as_int(args, "tic", None)  # default value for sample
     sector = get_arg_as_int(args, "sector", None)
