@@ -23,5 +23,5 @@ aiobotocore==2.15.2
 # Note: lightkurve includes bokeh as well,
 #       but a specific version is pinned to ensure better stability,
 #       given it is the backbone of the webapp.
-bokeh==3.6.1
+bokeh==3.7.3
 skypatrol>=0.6.16,<1.0
