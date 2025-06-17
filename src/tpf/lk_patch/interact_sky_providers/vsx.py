@@ -13,6 +13,7 @@ from astropy.time import Time
 import numpy as np
 
 import requests
+from requests import HTTPError
 
 from lightkurve import LightkurveError
 from .core import ProperMotionCorrectionMeta, InteractSkyCatalogProvider
@@ -200,6 +201,22 @@ def _query_cone_region(ra2000, dec2000, radius_deg, magnitude_limit=None):
         log.debug(f"Query VSX with: {query_url}")
         result = _do_remote_query(query_url)
         return _parse_response(result)
+    except HTTPError as he:
+        # report VSX rate limiting (by AWS Captcha) differently
+        # http://forums.aavso.org/t/rate-limiting-notice-for-vsx-aavso-org/2649/6
+        # https://docs.aws.amazon.com/waf/latest/developerguide/waf-captcha-and-challenge-actions.html
+        rate_limit_status_codes = [
+            202,  # hit silent challenge (that will pass from a browser, but not API access such as here)
+            405,  # hit captcha
+        ]
+        if he.response.status_code in rate_limit_status_codes:
+            rate_limit_err_msg = (
+                f"HTTP {he.response.status_code} {he.response.reason} ; "
+                f"x-amzn-waf-action: {he.response.headers.get('x-amzn-waf-action')}"
+            )
+            raise LightkurveError(f"Rate Limit Error ({rate_limit_err_msg}) in querying VSX with {query_url}", he)
+        else:
+            raise LightkurveError(f"HTTPError in querying VSX with {query_url}", he)
     except Exception as e:
         raise LightkurveError(f"Error in querying VSX with {query_url}", e)
 
