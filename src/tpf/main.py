@@ -626,6 +626,7 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
 
             img_html = f'<img src="{export_plt_fig_as_data_uri(fig)}" />'
             out_plot_per_pixels.text = img_html
+            plt.close()  # release figure memory, it's exported to <img> tag as data URI
 
         def plot_per_pixels_with_msg():
             msg = "Creating per-pixel plot..."
