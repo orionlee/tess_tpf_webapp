@@ -10,6 +10,8 @@ snapshot_old = None
 
 LOG_TOP_MALLOC_LIMIT = 5
 
+LOG_MUMPY_DIFF = True
+
 
 def log_resource_info(msg_prefix):
     # log various system resources info,
@@ -31,18 +33,21 @@ def log_resource_info(msg_prefix):
     def get_num_active_threads():
         return threading.active_count()
 
-    if os.name != "posix":  # memory usage only works on Linux-like system
-        return
     if log.level < logging.DEBUG:  # run only if logging level is at least debug
         return
 
-    log.debug(
-        (
-            f"[MemLog] {msg_prefix: <26} MemAvailable: {get_memory_available()}"
-            f" ; Num. Active threads: {get_num_active_threads()}"
+    if os.name == "posix":  # memory usage only works on Linux-like system
+        log.debug(
+            (
+                f"[MemLog] {msg_prefix: <26} MemAvailable: {get_memory_available()}"
+                f" ; Num. Active threads: {get_num_active_threads()}"
+            )
         )
-    )
+
     log_top_malloc(limit=LOG_TOP_MALLOC_LIMIT)
+
+    if LOG_MUMPY_DIFF is True:
+        log_mumppy_diff()
 
 
 def _do_log_top_malloc(stats, limit):
@@ -102,3 +107,21 @@ def start_tracemalloc():
 
 def stop_tracemalloc():
     tracemalloc.stop()
+
+
+mumpy_tracker = None
+
+
+def log_mumppy_diff():
+    """Generate a summary of memory difference each time it's invoked."""
+    # pip install pympler
+    # https://pympler.readthedocs.io/en/latest/muppy.html#muppy
+    from pympler import tracker
+
+    global mumpy_tracker
+
+    if mumpy_tracker is None:
+        mumpy_tracker = tracker.SummaryTracker()
+    print("Memory Usage Diff:")
+    mumpy_tracker.print_diff()
+    print("", flush=True)
