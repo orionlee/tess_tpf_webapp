@@ -49,6 +49,8 @@ from bokeh.models.dom import HTML
 from bokeh.plotting import curdoc
 
 
+LOG_TPF_REFERRERS = True
+
 log = logging.getLogger(__name__)
 
 
@@ -793,6 +795,8 @@ async def create_app_body_ui(doc, tic, sector, magnitude_limit=None):
 
     # set at info level, as it might be useful to gather statistics on the type of tpfs being plotted ()
     log.info(f"Plot Skyview: {tpf}, sector={tpf.meta.get('SECTOR')}, exptime={sr.exptime[-1]}, TessCut={is_tesscut(tpf)}")
+    if LOG_TPF_REFERRERS:
+        doc.tpf = tpf  # keep tpf in UI session to test if it's kept beyond the session
     return await create_app_body_ui_from_tpf(doc, tpf, magnitude_limit=magnitude_limit)
 
 
@@ -925,6 +929,47 @@ def _progressive_plot_catalogs(doc, catalog_plot_fns):
         doc.add_timeout_callback(fn, 0)
 
 
+def log_tpf_referrers_on_session_destroyed(session_context):
+    import datetime
+    import gc
+
+    def print_a_ref(ref, expected_referrer):
+        if ref is expected_referrer:
+            print("[Expected]", type(ref))
+        elif isinstance(ref, dict) and ref.get("__name__") is not None:
+            print(f"dict[__name=={ref['__name__']}] ({len(ref)})")
+        elif isinstance(ref, dict) and len(ref) > 5:
+            print(f"dict ({len(ref)}) w/keys: {ref.keys()}")
+        elif isinstance(ref, dict):
+            print(ref)
+        else:
+            print(type(ref))
+            # print(ref)
+
+    def show_referrers(obj, expected_referrer, label):
+        refs = gc.get_referrers(obj)
+        print(f"Referrers of {label} ({len(refs)}):")
+        for r in refs:
+            print_a_ref(r, expected_referrer)
+
+    # main logic
+    print(  # somehow log object cannot not be found
+        f"DBG {datetime.datetime.now()} in on_session_destroyed(). "
+        f"Num. bokeh sessions: {len(session_context.server_context.sessions)}"
+    )
+    # for a in dir(session_context):
+    #     print("    ", a)
+    # print("._document: ", session_context._document)
+    if hasattr(session_context._document, "tpf"):
+        print(f"DBG2: tpf ({session_context._document.tpf}) present. Check its referrers, then do GC ...")
+        # the tpf is expected to be held by curdoc. Any additional referrer could be hints of memory leaks.
+        show_referrers(session_context._document.tpf, session_context._document, "TPF")
+        session_context._document.tpf = None
+        gc.collect()
+
+    print("", flush=True)
+
+
 def show_app(tic, sector, magnitude_limit=None):
 
     async def create_app_ui(doc):
@@ -968,6 +1013,8 @@ def show_app(tic, sector, magnitude_limit=None):
     # the actual entry point
     #
     doc = curdoc()
+    if LOG_TPF_REFERRERS:
+        doc.on_session_destroyed(log_tpf_referrers_on_session_destroyed)
     doc.add_next_tick_callback(lambda: create_app_ui(doc))
 
 
