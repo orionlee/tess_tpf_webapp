@@ -388,19 +388,20 @@ def export_plt_fig_as_data_uri(fig, close_fig=True):
     from io import BytesIO
     import matplotlib.pyplot as plt
 
-    buf = BytesIO()  # a temporary buffer
-    fig.savefig(buf, format="png")
-    data = base64.b64encode(buf.getbuffer()).decode("ascii")
-    uri = f"data:image/png;base64,{data}"
-
-    # to avoid memory leaks,
-    # as figures created by pyplot are kept in memory by default
-    # see: https://matplotlib.org/stable/gallery/user_interfaces/web_application_server_sgskip.html
-    if close_fig:
-        # https://stackoverflow.com/a/49748374
-        fig.clear()  # fig.clf()
-        plt.close(fig)
-    return uri
+    try:
+        buf = BytesIO()  # a temporary buffer
+        fig.savefig(buf, format="png")
+        data = base64.b64encode(buf.getbuffer()).decode("ascii")
+        uri = f"data:image/png;base64,{data}"
+        return uri
+    finally:
+        # to avoid memory leaks,
+        # as figures created by pyplot are kept in memory by default
+        # see: https://matplotlib.org/stable/gallery/user_interfaces/web_application_server_sgskip.html
+        if close_fig:
+            # https://stackoverflow.com/a/49748374
+            fig.clear()  # fig.clf()
+            plt.close(fig)
 
 
 def create_tpf_interact_ui(tpf, fig_tpf_skyview=None, hide_save_to_local_btn=True):
@@ -606,27 +607,31 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
 
             shape = tpf_trunc.flux[0].shape
             fig = plt.figure(figsize=(shape[1] * pixel_size_inches, shape[0] * pixel_size_inches))
-            ax = tpf_trunc.plot_pixels(
-                ax=fig.gca(),
-                aperture_mask=aperture_mask_trunc,
-                corrector_func=corrector_func,
-                show_flux=True,
-                markersize=markersize,
-                # OPEN: add corrector_func to obey ylim_func?!
-            )
-            ax.set_title(
-                (
-                    f"TIC {tpf_trunc.meta.get('TICID')}, "
-                    f"Sector {tpf_trunc.meta.get('SECTOR')}, "
-                    f"Camera {tpf_trunc.meta.get('CAMERA')}.{tpf_trunc.meta.get('CCD')}, "
-                    f"{tpf_trunc.time.min().value:.2f} - {tpf_trunc.time.max().value:.2f} [{tpf_trunc.time.format.upper()}] "
-                ),
-                fontsize=12,
-            )
+            try:
+                ax = tpf_trunc.plot_pixels(
+                    ax=fig.gca(),
+                    aperture_mask=aperture_mask_trunc,
+                    corrector_func=corrector_func,
+                    show_flux=True,
+                    markersize=markersize,
+                    # OPEN: add corrector_func to obey ylim_func?!
+                )
+                ax.set_title(
+                    (
+                        f"TIC {tpf_trunc.meta.get('TICID')}, "
+                        f"Sector {tpf_trunc.meta.get('SECTOR')}, "
+                        f"Camera {tpf_trunc.meta.get('CAMERA')}.{tpf_trunc.meta.get('CCD')}, "
+                        f"{tpf_trunc.time.min().value:.2f} - {tpf_trunc.time.max().value:.2f} [{tpf_trunc.time.format.upper()}] "
+                    ),
+                    fontsize=12,
+                )
 
-            img_html = f'<img src="{export_plt_fig_as_data_uri(fig)}" />'
-            out_plot_per_pixels.text = img_html
-            plt.close()  # release figure memory, it's exported to <img> tag as data URI
+                img_html = f'<img src="{export_plt_fig_as_data_uri(fig)}" />'
+                out_plot_per_pixels.text = img_html
+            finally:
+                # release figure memory (last resort).
+                # Normally it should have been already been done in export_plt_fig_as_data_uri
+                plt.close()
 
         def plot_per_pixels_with_msg():
             msg = "Creating per-pixel plot..."
@@ -1020,6 +1025,7 @@ def show_in_notebook_app_body_ui_from_tpf(tpf, magnitude_limit=None, catalogs=No
 #
 # Webapp entry Point logic
 #
+
 
 def get_arg_as_int(args, arg_name, default_val=None):
     try:
