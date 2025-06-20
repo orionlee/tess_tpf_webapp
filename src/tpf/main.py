@@ -115,6 +115,16 @@ def _do_read_lc(url):
     return read_lc(url)
 
 
+def _replace_or_append_by_name(ui_container, new_model):
+    old_model = ui_container.select_one({"name": new_model.name})
+    if old_model is not None:
+        # https://discourse.bokeh.org/t/clearing-plot-or-removing-all-glyphs/6792/6
+        idx = ui_container.children.index(old_model)
+        ui_container.children[idx] = new_model
+    else:
+        ui_container.children.append(new_model)
+
+
 def make_lc_fig(url, period=None, epoch=None, epoch_format=None, use_cmap_for_folded=False):
     log.info(f"Plot LC: {url}, period={period}, epoch={epoch}, epoch_format={epoch_format}, use_cmap={use_cmap_for_folded}")
     try:
@@ -287,22 +297,12 @@ def create_lc_viewer_ui():
         fig = make_lc_fig(url, period, epoch, epoch_format, use_cmap_for_folded)
 
         # add the plot (replacing existing plot, if any)
-        old_fig = ui_layout.select_one({"name": "lc_fig"})
-        if old_fig is not None:
-            # https://discourse.bokeh.org/t/clearing-plot-or-removing-all-glyphs/6792/6
-            ui_layout.children[-1] = fig
-        else:
-            ui_layout.children.append(fig)
+        _replace_or_append_by_name(ui_layout, fig)
 
     def add_lc_fig_with_msg():
         # immediately show a message, as the actual plotting would take time
         msg_ui = Div(text="Plotting...", name="lc_fig")
-        old_fig = ui_layout.select_one({"name": "lc_fig"})
-        if old_fig is not None:
-            # https://discourse.bokeh.org/t/clearing-plot-or-removing-all-glyphs/6792/6
-            ui_layout.children[-1] = msg_ui
-        else:
-            ui_layout.children.append(msg_ui)
+        _replace_or_append_by_name(ui_layout, msg_ui)
         curdoc().add_next_tick_callback(add_lc_fig)
 
     btn_plot.on_click(add_lc_fig_with_msg)
@@ -649,22 +649,12 @@ Consider to shorten the range.
 
         # interact() plot done
         # add the plot (replacing existing plot, if any)
-        old_fig = ui_layout.select_one({"name": "tpf_interact_fig"})
-        if old_fig is not None:
-            # https://discourse.bokeh.org/t/clearing-plot-or-removing-all-glyphs/6792/6
-            ui_layout.children[-1] = ui_body
-        else:
-            ui_layout.children.append(ui_body)
+        _replace_or_append_by_name(ui_layout, ui_body)
 
     def add_tpf_interact_fig_with_msg():
         # immediately show a message, as the actual plotting would take time
         msg_ui = Div(text="Plotting...", name="tpf_interact_fig")
-        old_fig = ui_layout.select_one({"name": "tpf_interact_fig"})
-        if old_fig is not None:
-            # https://discourse.bokeh.org/t/clearing-plot-or-removing-all-glyphs/6792/6
-            ui_layout.children[-1] = msg_ui
-        else:
-            ui_layout.children.append(msg_ui)
+        _replace_or_append_by_name(ui_layout, msg_ui)
         curdoc().add_next_tick_callback(add_tpf_interact_fig)
 
     btn_inspect.on_click(add_tpf_interact_fig_with_msg)
