@@ -25,3 +25,7 @@ aiobotocore==2.15.2
 #       given it is the backbone of the webapp.
 bokeh==3.7.3
 skypatrol>=0.6.16,<1.0
+
+# for resource monitoring (memory, etc.)
+psutil
+pympler
