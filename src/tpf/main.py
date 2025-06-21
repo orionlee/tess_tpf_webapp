@@ -961,11 +961,11 @@ def log_tpf_referrers_on_session_destroyed(session_context):
     #     print("    ", a)
     # print("._document: ", session_context._document)
     if hasattr(session_context._document, "tpf"):
-        print(f"DBG2: tpf ({session_context._document.tpf}) present. Check its referrers, then do GC ...")
+        print(f"DBG2: tpf ({session_context._document.tpf}) present. Check its referrers...")
         # the tpf is expected to be held by curdoc. Any additional referrer could be hints of memory leaks.
         show_referrers(session_context._document.tpf, session_context._document, "TPF")
         session_context._document.tpf = None
-        gc.collect()
+        # gc.collect()  # commented out gc.collect() to better simulate the app without the monitoring codes
 
     print("", flush=True)
 
