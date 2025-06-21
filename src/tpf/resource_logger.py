@@ -56,7 +56,10 @@ def log_resource_info(msg_prefix):
         (
             f"[RsrcLog] {msg_prefix: <26} {get_mem_info_text()}"
             f" ; Num. threads: {_cur_process.num_threads()}"
-            f" ; Num. open files: {len(_cur_process.open_files())}"
+            # comment out as it causes `IndexError: list index out of range`` in gcloud
+            # From .../psutil/_pslinux.py", line 2256, in open_files
+            # flags = int(f.readline().split()[1], 8)
+            # f" ; Num. open files: {len(_cur_process.open_files())}"
         )
     )
 
