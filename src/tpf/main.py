@@ -115,6 +115,16 @@ def _do_read_lc(url):
     return read_lc(url)
 
 
+def _replace_or_append_by_name(ui_container, new_model):
+    old_model = ui_container.select_one({"name": new_model.name})
+    if old_model is not None:
+        # https://discourse.bokeh.org/t/clearing-plot-or-removing-all-glyphs/6792/6
+        idx = ui_container.children.index(old_model)
+        ui_container.children[idx] = new_model
+    else:
+        ui_container.children.append(new_model)
+
+
 def make_lc_fig(url, period=None, epoch=None, epoch_format=None, use_cmap_for_folded=False):
     log.info(f"Plot LC: {url}, period={period}, epoch={epoch}, epoch_format={epoch_format}, use_cmap={use_cmap_for_folded}")
     try:
@@ -287,22 +297,12 @@ def create_lc_viewer_ui():
         fig = make_lc_fig(url, period, epoch, epoch_format, use_cmap_for_folded)
 
         # add the plot (replacing existing plot, if any)
-        old_fig = ui_layout.select_one({"name": "lc_fig"})
-        if old_fig is not None:
-            # https://discourse.bokeh.org/t/clearing-plot-or-removing-all-glyphs/6792/6
-            ui_layout.children[-1] = fig
-        else:
-            ui_layout.children.append(fig)
+        _replace_or_append_by_name(ui_layout, fig)
 
     def add_lc_fig_with_msg():
         # immediately show a message, as the actual plotting would take time
         msg_ui = Div(text="Plotting...", name="lc_fig")
-        old_fig = ui_layout.select_one({"name": "lc_fig"})
-        if old_fig is not None:
-            # https://discourse.bokeh.org/t/clearing-plot-or-removing-all-glyphs/6792/6
-            ui_layout.children[-1] = msg_ui
-        else:
-            ui_layout.children.append(msg_ui)
+        _replace_or_append_by_name(ui_layout, msg_ui)
         curdoc().add_next_tick_callback(add_lc_fig)
 
     btn_plot.on_click(add_lc_fig_with_msg)
@@ -388,19 +388,20 @@ def export_plt_fig_as_data_uri(fig, close_fig=True):
     from io import BytesIO
     import matplotlib.pyplot as plt
 
-    buf = BytesIO()  # a temporary buffer
-    fig.savefig(buf, format="png")
-    data = base64.b64encode(buf.getbuffer()).decode("ascii")
-    uri = f"data:image/png;base64,{data}"
-
-    # to avoid memory leaks,
-    # as figures created by pyplot are kept in memory by default
-    # see: https://matplotlib.org/stable/gallery/user_interfaces/web_application_server_sgskip.html
-    if close_fig:
-        # https://stackoverflow.com/a/49748374
-        fig.clear()  # fig.clf()
-        plt.close(fig)
-    return uri
+    try:
+        buf = BytesIO()  # a temporary buffer
+        fig.savefig(buf, format="png")
+        data = base64.b64encode(buf.getbuffer()).decode("ascii")
+        uri = f"data:image/png;base64,{data}"
+        return uri
+    finally:
+        # to avoid memory leaks,
+        # as figures created by pyplot are kept in memory by default
+        # see: https://matplotlib.org/stable/gallery/user_interfaces/web_application_server_sgskip.html
+        if close_fig:
+            # https://stackoverflow.com/a/49748374
+            fig.clear()  # fig.clf()
+            plt.close(fig)
 
 
 def create_tpf_interact_ui(tpf, fig_tpf_skyview=None, hide_save_to_local_btn=True):
@@ -606,27 +607,31 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
 
             shape = tpf_trunc.flux[0].shape
             fig = plt.figure(figsize=(shape[1] * pixel_size_inches, shape[0] * pixel_size_inches))
-            ax = tpf_trunc.plot_pixels(
-                ax=fig.gca(),
-                aperture_mask=aperture_mask_trunc,
-                corrector_func=corrector_func,
-                show_flux=True,
-                markersize=markersize,
-                # OPEN: add corrector_func to obey ylim_func?!
-            )
-            ax.set_title(
-                (
-                    f"TIC {tpf_trunc.meta.get('TICID')}, "
-                    f"Sector {tpf_trunc.meta.get('SECTOR')}, "
-                    f"Camera {tpf_trunc.meta.get('CAMERA')}.{tpf_trunc.meta.get('CCD')}, "
-                    f"{tpf_trunc.time.min().value:.2f} - {tpf_trunc.time.max().value:.2f} [{tpf_trunc.time.format.upper()}] "
-                ),
-                fontsize=12,
-            )
+            try:
+                ax = tpf_trunc.plot_pixels(
+                    ax=fig.gca(),
+                    aperture_mask=aperture_mask_trunc,
+                    corrector_func=corrector_func,
+                    show_flux=True,
+                    markersize=markersize,
+                    # OPEN: add corrector_func to obey ylim_func?!
+                )
+                ax.set_title(
+                    (
+                        f"TIC {tpf_trunc.meta.get('TICID')}, "
+                        f"Sector {tpf_trunc.meta.get('SECTOR')}, "
+                        f"Camera {tpf_trunc.meta.get('CAMERA')}.{tpf_trunc.meta.get('CCD')}, "
+                        f"{tpf_trunc.time.min().value:.2f} - {tpf_trunc.time.max().value:.2f} [{tpf_trunc.time.format.upper()}] "
+                    ),
+                    fontsize=12,
+                )
 
-            img_html = f'<img src="{export_plt_fig_as_data_uri(fig)}" />'
-            out_plot_per_pixels.text = img_html
-            plt.close()  # release figure memory, it's exported to <img> tag as data URI
+                img_html = f'<img src="{export_plt_fig_as_data_uri(fig)}" />'
+                out_plot_per_pixels.text = img_html
+            finally:
+                # release figure memory (last resort).
+                # Normally it should have been already been done in export_plt_fig_as_data_uri
+                plt.close()
 
         def plot_per_pixels_with_msg():
             msg = "Creating per-pixel plot..."
@@ -644,22 +649,12 @@ Consider to shorten the range.
 
         # interact() plot done
         # add the plot (replacing existing plot, if any)
-        old_fig = ui_layout.select_one({"name": "tpf_interact_fig"})
-        if old_fig is not None:
-            # https://discourse.bokeh.org/t/clearing-plot-or-removing-all-glyphs/6792/6
-            ui_layout.children[-1] = ui_body
-        else:
-            ui_layout.children.append(ui_body)
+        _replace_or_append_by_name(ui_layout, ui_body)
 
     def add_tpf_interact_fig_with_msg():
         # immediately show a message, as the actual plotting would take time
         msg_ui = Div(text="Plotting...", name="tpf_interact_fig")
-        old_fig = ui_layout.select_one({"name": "tpf_interact_fig"})
-        if old_fig is not None:
-            # https://discourse.bokeh.org/t/clearing-plot-or-removing-all-glyphs/6792/6
-            ui_layout.children[-1] = msg_ui
-        else:
-            ui_layout.children.append(msg_ui)
+        _replace_or_append_by_name(ui_layout, msg_ui)
         curdoc().add_next_tick_callback(add_tpf_interact_fig)
 
     btn_inspect.on_click(add_tpf_interact_fig_with_msg)
@@ -785,6 +780,8 @@ async def create_app_body_ui(doc, tic, sector, magnitude_limit=None):
     else:
         msg_label = f"TIC {tic}"
 
+    # log the beginning of search/download TPF to clearly see if it takes a long time
+    log.debug(f"Search and download TPF for TIC {tic}, sector {sector}.")
     tpf, sr = await get_tpf(tic, sector, msg_label)
 
     if tpf is None:
@@ -1019,6 +1016,7 @@ def show_in_notebook_app_body_ui_from_tpf(tpf, magnitude_limit=None, catalogs=No
 # Webapp entry Point logic
 #
 
+
 def get_arg_as_int(args, arg_name, default_val=None):
     try:
         val = int(args.get(arg_name)[0])
@@ -1048,7 +1046,9 @@ if __name__.startswith("bokeh_app_"):  # invoked from `bokeh serve`
     tic = get_arg_as_int(args, "tic", None)  # default value for sample
     sector = get_arg_as_int(args, "sector", None)
     magnitude_limit = get_arg_as_float(args, "magnitude_limit", None)
-    log.debug(f"Parameters: , {tic}, {sector}, {magnitude_limit} ; {args}")
+    # log bokeh session ID to make the log easier to correlate but logs generated by bokeh server
+    session_id = curdoc().session_context.id
+    log.debug(f"Parameters: , {tic}, {sector}, {magnitude_limit} ; {args} . session '{session_id}'")
 
     curdoc().title = "TESS Target Pixels Inspector"
     show_app(tic, sector, magnitude_limit)
