@@ -25,4 +25,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 #       add environment variable BOKEH_ALLOW_WS_ORIGIN
 #       and set it to the public hostname of the deployed service.
 # See: https://docs.bokeh.org/en/latest/docs/reference/command/subcommands/serve.html#network-configuration
-CMD exec bokeh serve --port $PORT tpf
+CMD exec bokeh serve --port $PORT tpf $BOKEH_EXTRA_ARGS
