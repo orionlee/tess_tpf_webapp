@@ -3,6 +3,7 @@ import os
 import linecache
 import tracemalloc
 
+import psutil
 
 log = logging.getLogger(__name__)
 
@@ -12,37 +13,52 @@ LOG_TOP_MALLOC_LIMIT = 5
 
 LOG_MUMPY_DIFF = True
 
+_cur_process = psutil.Process()
+_sys_mem_old = None
+_proc_mem_old = None
+
+
+def get_mem_info_text():
+    global _sys_mem_old, _proc_mem_old
+
+    def get_val_in_mb_and_delta(cur, old, attr, label):
+        cur_val = getattr(cur, attr) / 1024 / 1024
+        if old is None:
+            return f"{label}: {cur_val:.0f}"
+        old_val = getattr(old, attr) / 1024 / 1024
+        delta = cur_val - old_val
+        return f"{label}: {cur_val:.0f} ({delta:.1f})"
+
+    sys_mem = psutil.virtual_memory()
+    proc_mem = _cur_process.memory_full_info()
+    msg = ""
+
+    msg += get_val_in_mb_and_delta(sys_mem, _sys_mem_old, "available", "SysMemAvailable")
+    msg += " , "
+    msg += get_val_in_mb_and_delta(proc_mem, _proc_mem_old, "rss", "ProcMemRSS")
+    msg += " , "
+    msg += get_val_in_mb_and_delta(proc_mem, _proc_mem_old, "uss", "ProcMemUSS")
+    msg += " , "
+    msg += get_val_in_mb_and_delta(proc_mem, _proc_mem_old, "vms", "ProcMemVMS")
+    _sys_mem_old = sys_mem
+    _proc_mem_old = proc_mem
+    return msg
+
 
 def log_resource_info(msg_prefix):
     # log various system resources info,
     # to triage apparent memory leak in GCloud deployment
-    import threading
-
-    def get_memory_available():
-        # based on: https://stackoverflow.com/a/41125461
-        with open("/proc/meminfo", "r") as mem:
-            free_memory = 0
-            for i in mem:
-                sline = i.split()
-                # probably needed for older system without MemAvailable
-                # if str(sline[0]) in ('MemFree:', 'Buffers:', 'Cached:'):
-                if str(sline[0]) == "MemAvailable:":
-                    free_memory += int(sline[1])
-            return free_memory
-
-    def get_num_active_threads():
-        return threading.active_count()
 
     if log.level < logging.DEBUG:  # run only if logging level is at least debug
         return
 
-    if os.name == "posix":  # memory usage only works on Linux-like system
-        log.debug(
-            (
-                f"[MemLog] {msg_prefix: <26} MemAvailable: {get_memory_available()}"
-                f" ; Num. Active threads: {get_num_active_threads()}"
-            )
+    log.debug(
+        (
+            f"[RsrcLog] {msg_prefix: <26} {get_mem_info_text()}"
+            f" ; Num. threads: {_cur_process.num_threads()}"
+            f" ; Num. open files: {len(_cur_process.open_files())}"
         )
+    )
 
     log_top_malloc(limit=LOG_TOP_MALLOC_LIMIT)
 
