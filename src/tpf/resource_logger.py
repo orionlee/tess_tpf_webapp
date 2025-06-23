@@ -45,6 +45,28 @@ def get_mem_info_text():
     return msg
 
 
+def get_file_info_text():
+    p = _cur_process  # shorthand
+    if hasattr(p, "num_fds"):
+        msg = f"num_fds: {p.num_fds()}"
+    elif hasattr(p, "num_handles"):
+        msg = f"num_handles: {p.num_handles}"  # Windows
+    else:  # should not happen
+        msg = ""
+
+    try:
+        # to track if TPF FITS files remain open after it's done
+        num_open_fits = len([po for po in p.open_files() if ".fits" in po.path])
+        msg += f" , num_open_FITS: {num_open_fits}"
+    except Exception as e:
+        # in gcloud, it intermnittently causes `IndexError: list index out of range``
+        # From .../psutil/_pslinux.py", line 2256, in open_files
+        # flags = int(f.readline().split()[1], 8)
+        msg += f", num_open_FITS: <{type(e).__name__}>"
+
+    return msg
+
+
 def log_resource_info(msg_prefix):
     # log various system resources info,
     # to triage apparent memory leak in GCloud deployment
@@ -55,11 +77,8 @@ def log_resource_info(msg_prefix):
     log.debug(
         (
             f"[RsrcLog] {msg_prefix: <26} {get_mem_info_text()}"
-            f" ; Num. threads: {_cur_process.num_threads()}"
-            # comment out as it causes `IndexError: list index out of range`` in gcloud
-            # From .../psutil/_pslinux.py", line 2256, in open_files
-            # flags = int(f.readline().split()[1], 8)
-            # f" ; Num. open files: {len(_cur_process.open_files())}"
+            f" ; num_threads: {_cur_process.num_threads()}"
+            f" ; {get_file_info_text()}"
         )
     )
 
