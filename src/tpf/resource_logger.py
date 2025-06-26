@@ -50,7 +50,7 @@ def get_file_info_text():
     if hasattr(p, "num_fds"):
         msg = f"num_fds: {p.num_fds()}"
     elif hasattr(p, "num_handles"):
-        msg = f"num_handles: {p.num_handles}"  # Windows
+        msg = f"num_handles: {p.num_handles()}"  # Windows
     else:  # should not happen
         msg = ""
 
