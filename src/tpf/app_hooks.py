@@ -1,6 +1,8 @@
 import logging
 import os
+import sys
 import time
+import traceback
 
 import psutil
 
@@ -21,13 +23,33 @@ def set_log_level_from_env():
     return level_str
 
 
+def get_last_line_of_tb(tb):
+    fs = traceback.extract_tb(tb)[-1]
+    # summarize the last line of the traceback to a single line
+    return f'File "{fs.filename}", line {fs.lineno}, in {fs.name}: {fs.line}'
+
+
 def _get_open_files():
     try:
         return [f.path for f in psutil.Process().open_files()]
     except Exception as e:
-        # intermittently psutil's `open_files()` fails in gcloud with TypeError
-        # we do not want it to stop the overall process
-        log.debug("_get_open_files() failed unexpectedly. Return empty list", e)
+        # we do not want any error to stop the overall process
+        if isinstance(e, IndexError):
+            # intermittently psutil's `open_files()` fails in gcloud with IndexError
+            # log it separately to avoid polluting the log
+            tb = sys.exc_info()[2]
+            log.debug(
+                (
+                    f"_get_open_files() failed with (likely intermittent) error {type(e).__name__} {e}. Return empty list. "
+                    f"{get_last_line_of_tb(tb)}"
+                )
+            )
+        else:
+            # other unexpected errors that might need further investigation
+            log.error(
+                f"_get_open_files() failed unexpectedly with error of type {type(e).__name__}. Return empty list",
+                exc_info=True,
+            )
         return []
 
 
