@@ -133,7 +133,11 @@ def _clear_old_cache_entry(ttl_mins):
         log_clear_file_cache_results("Lightkurve cache", lk_files_removed, lk_total_num_files)
         ap_files_removed, ap_total_num_files = _rm_files_by_atime(astropy.config.get_cache_dir(), atime_threshold)
         log_clear_file_cache_results("astropy    cache", ap_files_removed, ap_total_num_files)
-        # TODO: clear in-memory cache from lk.lk.search_targetpixelfile, lk.search_tesscut
+        # OPEN: clear in-memory cache from lk.search_targetpixelfile, lk.search_tesscut
+        # - no easy way to do it other than clear all, given
+        #   it's configured with unlimited cache with no TTL at lightkurve level
+        #   (using `memoization` package)
+        # - for now leave them alone, as they're rather small
 
 
 def on_server_loaded(server_context):
