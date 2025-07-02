@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 import time
+import threading
 import traceback
 
 import psutil
@@ -106,6 +107,9 @@ def _get_ttl_mins_from_env():
     return ttl
 
 
+_LOCK_CLEAR_OLD_CACHE_ENTRY = threading.Lock()
+
+
 def _clear_old_cache_entry(ttl_mins):
     def log_clear_file_cache_results(msg_prefix, files_removed, total_num_files):
         files_removed_abbrev = [os.path.basename(f) for f in files_removed]
@@ -114,19 +118,22 @@ def _clear_old_cache_entry(ttl_mins):
     if ttl_mins < 0:
         return
 
-    atime_threshold = time.time() - ttl_mins * 60
+    # use a lock prevent unwanted side effects,
+    # in case it's invoked almost simultaneously by different bokeh sessions
+    with _LOCK_CLEAR_OLD_CACHE_ENTRY:
+        atime_threshold = time.time() - ttl_mins * 60
 
-    atime_threshold_str = time.strftime(
-        "%Y-%m-%d %H:%M:%S %z",
-        time.localtime(atime_threshold),
-    )
-    log.debug(f"_clear_old_cache_entry(): ttl={ttl_mins}, or threshold={atime_threshold_str}")
+        atime_threshold_str = time.strftime(
+            "%Y-%m-%d %H:%M:%S %z",
+            time.localtime(atime_threshold),
+        )
+        log.debug(f"_clear_old_cache_entry(): ttl={ttl_mins}, or threshold={atime_threshold_str}")
 
-    lk_files_removed, lk_total_num_files = _rm_files_by_atime(lk.config.get_cache_dir(), atime_threshold)
-    log_clear_file_cache_results("Lightkurve cache", lk_files_removed, lk_total_num_files)
-    ap_files_removed, ap_total_num_files = _rm_files_by_atime(astropy.config.get_cache_dir(), atime_threshold)
-    log_clear_file_cache_results("astropy    cache", ap_files_removed, ap_total_num_files)
-    # TODO: clear in-memory cache from lk.lk.search_targetpixelfile, lk.search_tesscut
+        lk_files_removed, lk_total_num_files = _rm_files_by_atime(lk.config.get_cache_dir(), atime_threshold)
+        log_clear_file_cache_results("Lightkurve cache", lk_files_removed, lk_total_num_files)
+        ap_files_removed, ap_total_num_files = _rm_files_by_atime(astropy.config.get_cache_dir(), atime_threshold)
+        log_clear_file_cache_results("astropy    cache", ap_files_removed, ap_total_num_files)
+        # TODO: clear in-memory cache from lk.lk.search_targetpixelfile, lk.search_tesscut
 
 
 def on_server_loaded(server_context):
