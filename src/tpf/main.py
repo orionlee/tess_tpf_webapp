@@ -782,7 +782,8 @@ async def create_app_body_ui(doc, tic, sector, magnitude_limit=None):
 
     # log the beginning of search/download TPF to clearly see if it takes a long time
     log.debug(f"Search and download TPF for TIC {tic}, sector {sector}.")
-    tpf, sr = await get_tpf(tic, sector, msg_label)
+    # mark_tpf_accessed=True to facilitate LRU-like file cache cleaning done in app_hooks.py
+    tpf, sr = await get_tpf(tic, sector, msg_label, mark_tpf_accessed=True)
 
     if tpf is None:
         log.debug(f"Cannot find TPF or TESSCut for {msg_label}. No plot to be made.")
