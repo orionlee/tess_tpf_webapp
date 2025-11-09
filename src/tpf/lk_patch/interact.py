@@ -511,9 +511,14 @@ def add_catalog_figure_elements(provider, result, tpf, fig, ui_ctr, message_sele
         if catalog_select_ui is not None:
             cat_idx = catalog_select_ui.labels.index(provider.label)
             catalog_select_ui.active.append(cat_idx)
+            # a bit tricky: the initial label is just the provider label,
+            # which is necessary for the above query logic
+            # below we then change label (after it's queried) to include num. of results
+            # the change is ok because no subsequent logic relies on the checkbox label text anymore
+            catalog_select_ui.labels[cat_idx] = f"{provider.label} ({_len_provider_result(result, val_for_exc='error')})"
 
     # result: from  provider.query_catalog()
-    if result is None:
+    if result is None or isinstance(result, Exception):
         # case empty result, return a dummy renderer
         check_catalog_checkbox_if_present()  # still need to mark the checkbox to indicate it's done
         return fig.scatter()
@@ -684,6 +689,15 @@ def _create_background_task(func, *args, **kwargs):
     return create_task(to_thread(func, *args, **kwargs))
 
 
+def _len_provider_result(result, val_for_exc="E"):
+    """Helper to provide text to indicate num of rows in provider result in UI / logging"""
+    if result is None:
+        return 0
+    if isinstance(result, Exception):
+        return val_for_exc
+    return len(result)  # the normal case
+
+
 async def async_parse_and_add_catalogs_figure_elements(
     catalogs, magnitude_limit, tpf, doc, fig_tpf, ui_ctr, message_selected_target, arrow_4_selected
 ):
@@ -728,9 +742,7 @@ async def async_parse_and_add_catalogs_figure_elements(
         # https://docs.bokeh.org/en/latest/docs/user_guide/server/app.html#updating-from-unlocked-callbacks
 
         async def do_catalog_init_locked(result):
-            log.debug(
-                f"do_catalog_init_locked() for {tpf_label} - {provider.label}: {len(result) if result is not None else None}"
-            )
+            log.debug(f"do_catalog_init_locked() for {tpf_label} - {provider.label}: {_len_provider_result(result)}")
             try:
                 renderer = add_catalog_figure_elements(
                     provider, result, tpf, fig_tpf, ui_ctr, message_selected_target, arrow_4_selected
@@ -757,7 +769,7 @@ async def async_parse_and_add_catalogs_figure_elements(
                 # ensure the error from a provider would not stop the whole plot,
                 # e.g., if an user plots with Gaia and ZTF data, if ZTF times out,
                 # the user would still see Gaia data
-                result = None
+                result = err  # used by UI to signify error
                 err_str = f"{type(err).__name__}: {err}"
                 warnings.warn(
                     (
@@ -771,7 +783,7 @@ async def async_parse_and_add_catalogs_figure_elements(
                 # ensure the error from a provider would not stop the whole plot,
                 # e.g., if an user plots with Gaia and ZTF data, if ZTF times out,
                 # the user would still see Gaia data
-                result = None
+                result = err  # used by UI to signify errors
                 # user format_exc() instead of format_exception(err) to avoid
                 # format_exception() signature change in Python 3.10
                 err_str = f"{type(err).__name__}: {err}\n" + "".join(traceback.format_exc())
