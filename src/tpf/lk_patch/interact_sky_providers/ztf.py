@@ -1,4 +1,5 @@
 from functools import lru_cache
+import urllib
 from typing import Tuple, Union
 
 import astropy.units as u
@@ -182,10 +183,16 @@ class ZTFInteractSkyCatalogProvider(InteractSkyCatalogProvider):
 
     def get_detail_view(self, data: dict) -> Tuple[dict, list]:
         ztf_url = _to_lc_url(data["oid"], self.data_release, self.lc_format)  # the csv data
-        sand_url = f"https://ztf.snad.space/view/{data['oid']}"  # a web viewer
+        snad_url = f"https://ztf.snad.space/view/{data['oid']}"  # a web viewer
+        coordStrEncoded = urllib.parse.quote_plus(f"{data['ra']} {data['dec']}")
+        zubercal_url = (
+            "http://atua.caltech.edu/cgi-bin/get_Zubercal_Coords.cgi?"
+            f"RADec={coordStrEncoded}&Rad=0.1&PLOT=plot&IMG=ps1&FILT=filter&DB=all&.submit=Submit&OUT=csv&SHORT=short"
+        )  # Zubercal PSF photometry web viewer
         oid_html = (
             f"""{data['oid']} (<a href="{ztf_url}" title="csv data" target="_blank">LC</a>"""
-            f""",&emsp;<a href="{sand_url}" title="web viewer" target="_blank">sand</a>)"""
+            f""",&emsp;<a href="{snad_url}" title="SNAD web viewer" target="_blank">snad</a>"""
+            f""", <a href="{zubercal_url}" title="Zubercal PSF photometry web viewer" target="_blank">Zubercal</a>)"""
         )
         return {
             "ZTF OID": oid_html,

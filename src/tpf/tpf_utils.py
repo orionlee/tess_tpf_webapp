@@ -101,7 +101,26 @@ def _do_download_tesscut(sr, download_kwargs=None):
     return tpf
 
 
-async def get_tpf(tic, sector, msg_label, search_sources=None, search_kwargs=None, download_kwargs=None):
+def mark_file_accessed(tpf_or_path):
+    if tpf_or_path is None:
+        return None
+    if isinstance(tpf_or_path, lk.targetpixelfile.TargetPixelFile):
+        path = tpf_or_path.path
+    else:
+        path = tpf_or_path
+    # update mtime, atime to now
+    return os.utime(path)
+
+
+async def get_tpf(
+    tic,
+    sector,
+    msg_label,
+    search_sources=None,
+    search_kwargs=None,
+    download_kwargs=None,
+    mark_tpf_accessed=False,
+):
     # suppress the unnecessary logging error messages "No data found for target ..." from search
     # they just pollute the log output in an webapp environment
     search_log = lk.search.log
@@ -114,9 +133,14 @@ async def get_tpf(tic, sector, msg_label, search_sources=None, search_kwargs=Non
 
     search_log.error = error_ignore_no_data
     try:
-        return await _do_get_tpf(
+        tpf, sr = await _do_get_tpf(
             tic, sector, msg_label, search_sources=search_sources, search_kwargs=search_kwargs, download_kwargs=download_kwargs
         )
+        if mark_tpf_accessed:
+            # update timestamp of the TPF, useful for cases where the file cache
+            # needs to be managed by LRU-like scheme (such as the policy in app_hooks.py)
+            mark_file_accessed(tpf)
+        return tpf, sr
     finally:
         search_log.error = error_original
 
