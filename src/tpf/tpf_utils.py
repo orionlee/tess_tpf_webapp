@@ -155,6 +155,11 @@ async def _do_get_tpf(tic, sector, msg_label, search_sources=None, search_kwargs
     else:
         raise ValueError(f"Invalid search_sources: {search_sources}")
 
+    if isinstance(tic, int):
+        target = f"TIC{tic}"
+    else:
+        target = tic  # use the literal value, be it a name, coordinate, etc.
+
     @timed()
     def do_search_tpf():
         if not to_search_tpf:
@@ -163,7 +168,7 @@ async def _do_get_tpf(tic, sector, msg_label, search_sources=None, search_kwargs
 
         search_kwargs_actual = search_kwargs if search_kwargs is not None else dict()
 
-        sr = search_targetpixelfile(f"TIC{tic}", mission="TESS", sector=sector, **search_kwargs_actual)
+        sr = search_targetpixelfile(target, mission="TESS", sector=sector, **search_kwargs_actual)
         if len(sr) > 1 and len(search_kwargs_actual) < 1:
             # by default, exclude fast cadence data (20s), TPFs with fast cadence always has 2 min cadence counterparts
             # for the use case here, the fast cadence data is irrelevant. It'd just make the processing slower.
@@ -178,7 +183,7 @@ async def _do_get_tpf(tic, sector, msg_label, search_sources=None, search_kwargs
         if not to_search_tesscut:
             log.debug("do_search_tesscut() skipped due to user override")
             return lk.SearchResult()
-        sr = search_tesscut(f"TIC{tic}", sector=sector)
+        sr = search_tesscut(target, sector=sector)
         return sr
 
     @timed()
@@ -188,7 +193,7 @@ async def _do_get_tpf(tic, sector, msg_label, search_sources=None, search_kwargs
         if not to_search_tesscut:
             log.debug("do_fast_search_tesscut() skipped due to user override")
             return lk.SearchResult()
-        sr = fast_search_tesscut(f"TIC{tic}", sector=sector)
+        sr = fast_search_tesscut(target, sector=sector)
         return sr
 
     # Search TPF and TessCut in parallel, to speed up for cases for TessCut is to be used
