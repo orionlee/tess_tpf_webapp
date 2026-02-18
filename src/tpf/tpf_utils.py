@@ -2,16 +2,14 @@ import logging
 import os
 import warnings
 
+import astropy.units as u
+import lightkurve as lk
+import numpy as np
+from astropy.table import Table
 from retry import retry
 
-from astropy.table import Table
-import astropy.units as u
-import numpy as np
-
-import lightkurve as lk
-from .lk_patch.interact import _get_corrected_coordinate, _create_background_task
+from .lk_patch.interact import _create_background_task, _get_corrected_coordinate
 from .lk_patch.timed import timed
-
 
 log = logging.getLogger(__name__)
 
@@ -27,12 +25,27 @@ LK_SEARCH_NUM_RETRIES = os.environ.get("LK_SEARCH_NUM_RETRIES", 4)
 
 # use tpf_utils.log instance so that retry warning would show up in gcloud log
 
-@retry(IOError, tries=LK_SEARCH_NUM_RETRIES, delay=0.5, backoff=2, jitter=(0, 0.5), logger=log)
+
+@retry(
+    IOError,
+    tries=LK_SEARCH_NUM_RETRIES,
+    delay=0.5,
+    backoff=2,
+    jitter=(0, 0.5),
+    logger=log,
+)
 def search_targetpixelfile(*args, **kwargs):
     return lk.search_targetpixelfile(*args, **kwargs)
 
 
-@retry(IOError, tries=LK_SEARCH_NUM_RETRIES, delay=0.5, backoff=2, jitter=(0, 0.5), logger=log)
+@retry(
+    IOError,
+    tries=LK_SEARCH_NUM_RETRIES,
+    delay=0.5,
+    backoff=2,
+    jitter=(0, 0.5),
+    logger=log,
+)
 def search_tesscut(*args, **kwargs):
     return lk.search_tesscut(*args, **kwargs)
 
@@ -85,7 +98,10 @@ def _do_download_tesscut(sr, download_kwargs=None):
         download_kwargs = dict()
     if download_kwargs.get("cutout_size", None) is None:
         download_kwargs = download_kwargs.copy()
-        download_kwargs["cutout_size"] = (11, 11)  # OPEN: would be too small for bright stars
+        download_kwargs["cutout_size"] = (
+            11,
+            11,
+        )  # OPEN: would be too small for bright stars
 
     tpf = sr[-1].download(**download_kwargs)
 
@@ -97,7 +113,10 @@ def _do_download_tesscut(sr, download_kwargs=None):
         tpf.hdu[0].header["OBJECT"] = f"TIC {tic}"
         tpf.meta = lk.targetpixelfile.HduToMetaMapping(tpf.hdu[0])
     except Exception as e:
-        warnings.warn("Unexpected error in extracting TIC from TessCut SearchResult. TIC will not be shown." f" Error: {e}")
+        warnings.warn(
+            "Unexpected error in extracting TIC from TessCut SearchResult. TIC will not be shown."
+            f" Error: {e}"
+        )
     return tpf
 
 
@@ -134,7 +153,12 @@ async def get_tpf(
     search_log.error = error_ignore_no_data
     try:
         tpf, sr = await _do_get_tpf(
-            tic, sector, msg_label, search_sources=search_sources, search_kwargs=search_kwargs, download_kwargs=download_kwargs
+            tic,
+            sector,
+            msg_label,
+            search_sources=search_sources,
+            search_kwargs=search_kwargs,
+            download_kwargs=download_kwargs,
         )
         if mark_tpf_accessed:
             # update timestamp of the TPF, useful for cases where the file cache
@@ -145,7 +169,14 @@ async def get_tpf(
         search_log.error = error_original
 
 
-async def _do_get_tpf(tic, sector, msg_label, search_sources=None, search_kwargs=None, download_kwargs=None):
+async def _do_get_tpf(
+    tic,
+    sector,
+    msg_label,
+    search_sources=None,
+    search_kwargs=None,
+    download_kwargs=None,
+):
     if search_sources is None or search_sources == "all":
         to_search_tpf, to_search_tesscut = True, True
     elif search_sources == "tpf":
@@ -168,7 +199,9 @@ async def _do_get_tpf(tic, sector, msg_label, search_sources=None, search_kwargs
 
         search_kwargs_actual = search_kwargs if search_kwargs is not None else dict()
 
-        sr = search_targetpixelfile(target, mission="TESS", sector=sector, **search_kwargs_actual)
+        sr = search_targetpixelfile(
+            target, mission="TESS", sector=sector, **search_kwargs_actual
+        )
         if len(sr) > 1 and len(search_kwargs_actual) < 1:
             # by default, exclude fast cadence data (20s), TPFs with fast cadence always has 2 min cadence counterparts
             # for the use case here, the fast cadence data is irrelevant. It'd just make the processing slower.
@@ -233,7 +266,9 @@ async def _do_get_tpf(tic, sector, msg_label, search_sources=None, search_kwargs
                 #
                 # Here we try to catch this special case, and treat it as no TPF found,
                 # which also reduces log pollution.
-                log.debug(f"TPF likely not found for {msg_label} in  TessCut either. {e}")
+                log.debug(
+                    f"TPF likely not found for {msg_label} in  TessCut either. {e}"
+                )
                 return None, None
             else:
                 raise e
@@ -253,7 +288,8 @@ def has_non_science_pixels(tpf):
         tpf.column < 45  # virtual pixels to the left
         or tpf.column + tpf.shape[2] > 2092  # virtual pixels to the right
         or tpf.row + tpf.shape[1] > 2048  # virtual pixels above
-        or tpf.row < 1  # virtual pixels below (Should not happen, but keep it here for just in case)
+        or tpf.row
+        < 1  # virtual pixels below (Should not happen, but keep it here for just in case)
     )
 
 
@@ -318,7 +354,9 @@ def create_background_mask_by_threshold(tpf, exclude_target_pixels=True):
     """Create a rough background mask."""
     # based on:
     # https://github.com/lightkurve/lightkurve/blob/main/docs/source/tutorials/2-creating-light-curves/2-1-cutting-out-tpfs.ipynb
-    background_mask_initial = ~tpf.create_threshold_mask(threshold=0.001, reference_pixel=None)
+    background_mask_initial = ~tpf.create_threshold_mask(
+        threshold=0.001, reference_pixel=None
+    )
     if not exclude_target_pixels:
         return background_mask_initial
 
@@ -337,9 +375,13 @@ def create_background_per_pixel_lc(tpf, exclude_target_pixels=True):
     """Helper for a rough background subtraction, used in TessCut TPFs."""
     # based on:
     # https://github.com/lightkurve/lightkurve/blob/main/docs/source/tutorials/2-creating-light-curves/2-1-cutting-out-tpfs.ipynb
-    background_mask = create_background_mask_by_threshold(tpf, exclude_target_pixels=exclude_target_pixels)
+    background_mask = create_background_mask_by_threshold(
+        tpf, exclude_target_pixels=exclude_target_pixels
+    )
     n_background_pixels = background_mask.sum()
-    background_lc_per_pixel = tpf.to_lightcurve(aperture_mask=background_mask) / n_background_pixels
+    background_lc_per_pixel = (
+        tpf.to_lightcurve(aperture_mask=background_mask) / n_background_pixels
+    )
     return background_lc_per_pixel
 
 
