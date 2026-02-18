@@ -357,10 +357,14 @@ def create_background_mask_by_threshold(tpf, exclude_target_pixels=True):
     background_mask_initial = ~tpf.create_threshold_mask(
         threshold=0.001, reference_pixel=None
     )
-    if not exclude_target_pixels:
+    if exclude_target_pixels is False:
         return background_mask_initial
 
-    target_mask = create_mask_for_target(tpf, mask_shape="3x3")
+    if exclude_target_pixels is True:
+        target_mask = create_mask_for_target(tpf, mask_shape="3x3")
+    else:
+        target_mask = exclude_target_pixels  # assume a mask is given
+
     background_mask = background_mask_initial & ~target_mask
     if background_mask.sum() < 1:
         background_mask = background_mask_initial
