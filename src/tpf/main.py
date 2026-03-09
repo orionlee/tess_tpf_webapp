@@ -923,6 +923,14 @@ def _progressive_plot_catalogs(doc, catalog_plot_fns):
         doc.add_timeout_callback(fn, 0)
 
 
+def suppress_bokeh_default_reconnect_and_ui(doc):
+    # starting in bokeh v3.8, bokeh by default tries to reconnect lost session (and notify the user with UI)
+    # the new logic is not helpful in the main deployment scenario (webapp and Jupyter notebook)
+    if hasattr(doc, "config"):
+        doc.config.reconnect_session = False
+        doc.config.notify_connection_status = False
+
+
 def show_app(tic, sector, magnitude_limit=None):
 
     async def create_app_ui(doc):
@@ -967,6 +975,7 @@ def show_app(tic, sector, magnitude_limit=None):
     #
     doc = curdoc()
     doc.add_next_tick_callback(lambda: create_app_ui(doc))
+    suppress_bokeh_default_reconnect_and_ui(doc)
 
 
 # BEGIN Jupyter notebook helpers, not used by the web app
@@ -988,6 +997,7 @@ def show_in_notebook(ui, notebook_url="localhost:8888"):
             ui(doc)
         else:
             doc.add_root(ui)
+        suppress_bokeh_default_reconnect_and_ui(doc)
 
     output_notebook(verbose=False, hide_banner=True)
     return show(do_show, notebook_url=notebook_url)
