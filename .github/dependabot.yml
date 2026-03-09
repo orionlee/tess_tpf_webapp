@@ -5,6 +5,11 @@
 
 version: 2
 updates:
+  - package-ecosystem: "docker"
+    # Docker - Google Cloud Deployment
+    directory: "/src/tpf/gcloud"
+    schedule:
+      interval: "weekly"
   - package-ecosystem: "pip"
     # Python PIP - Google Cloud Deployment
     directory: "/src/tpf/gcloud"
