@@ -1,6 +1,5 @@
 lightkurve>=2.5.0,<3.0
-# lightkurve not fully tested with  numpy 2. Use 1.x to be safe
-numpy<2.0
+numpy<3.0
 # lightkurve not fully tested with pandas. Use 2.x to be safe
 pandas<3.0
 retry>=0.9.2
