@@ -19,7 +19,7 @@ retry>=0.9.2
 # pip install --dry-run -r requirements.txt
 #
 boto3==1.42.61
-aiobotocore==3.2.1
+aiobotocore==3.3.0
 
 # avoid bokeh 3.4.x for tap selection issue
 # Note: lightkurve includes bokeh as well,
