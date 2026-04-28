@@ -26,7 +26,7 @@ aiobotocore==3.2.1
 #       but a specific version is pinned to ensure better stability,
 #       given it is the backbone of the webapp.
 bokeh==3.9.0
-skypatrol>=0.6.16,<1.0
+skypatrol>=0.6.21,<1.0
 
 # for clearing file cache
 psutil
