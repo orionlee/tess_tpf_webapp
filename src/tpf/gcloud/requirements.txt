@@ -18,8 +18,12 @@ retry>=0.9.2
 # One can test the requirements.txt by
 # pip install --dry-run -r requirements.txt
 #
-boto3==1.42.61
-aiobotocore==3.2.1
+# 20260501: the compatibility issue causing slow pip install
+# seems to have been resolved in the recent aiobotocore. 
+# So stop pinning specific versions. 
+#boto3==1.42.61
+#aiobotocore==3.2.1
+boto3
 
 # avoid bokeh 3.4.x for tap selection issue
 # Note: lightkurve includes bokeh as well,
