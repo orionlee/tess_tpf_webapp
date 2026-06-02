@@ -1,17 +1,17 @@
-from typing import Union
 import warnings
+from typing import Union
 
 import astropy.units as u
-
 from astropy.coordinates import SkyCoord
 from astropy.table import Table
-
 from astroquery.vizier import Vizier
 
 from .core import InteractSkyCatalogProvider
 
 
-def _query_cone_region(coord, radius, catalog, columns=["*"], query_kwargs=dict()) -> Table:
+def _query_cone_region(
+    coord, radius, catalog, columns=["*"], query_kwargs=dict()
+) -> Table:
     # Thin wrapper over Vizier's query_region
     vizier = Vizier(
         columns=columns,
@@ -21,7 +21,6 @@ def _query_cone_region(coord, radius, catalog, columns=["*"], query_kwargs=dict(
 
 
 class VizierInteractSkyCatalogProvider(InteractSkyCatalogProvider):
-
     def __init__(
         self,
         coord: SkyCoord,
@@ -44,12 +43,19 @@ class VizierInteractSkyCatalogProvider(InteractSkyCatalogProvider):
                 category=u.UnitsWarning,
                 message="Unit 'e' not supported by the VOUnit standard",
             )
-            result = _query_cone_region(self.coord, self.radius, self.catalog_name, columns=self.columns)
+            result = _query_cone_region(
+                self.coord, self.radius, self.catalog_name, columns=self.columns
+            )
         if result is None or len(result) == 0:
             return None
         result = result[self.catalog_name]
-        if self.magnitude_limit_column_name is not None and self.magnitude_limit is not None:
-            result = result[result[self.magnitude_limit_column_name] < self.magnitude_limit]
+        if (
+            self.magnitude_limit_column_name is not None
+            and self.magnitude_limit is not None
+        ):
+            result = result[
+                result[self.magnitude_limit_column_name] < self.magnitude_limit
+            ]
         # to be used as the basis for sizing the dots in plots
         if self.magnitude_limit_column_name is not None:
             result["magForSize"] = result[self.magnitude_limit_column_name]

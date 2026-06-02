@@ -1,17 +1,14 @@
-from functools import lru_cache
 import urllib
+from functools import lru_cache
 from typing import Tuple, Union
 
 import astropy.units as u
-
+import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy.table import Table
-
 from astroquery.ipac.irsa import Irsa
 
-import numpy as np
-
-from .core import ProperMotionCorrectionMeta, InteractSkyCatalogProvider
+from .core import InteractSkyCatalogProvider, ProperMotionCorrectionMeta
 
 
 def _to_lc_url(oid, data_release, format):
@@ -29,7 +26,9 @@ def _to_lc_url(oid, data_release, format):
 def _query_cone_region(ra_deg, dec_deg, radius_arcsec, catalog) -> Table:
     # Note: memoize the result: astroquery (as of v0.47) does not support caching for Irsa
     coord = SkyCoord(ra_deg * u.deg, dec_deg * u.deg, frame="icrs")
-    return Irsa.query_region(coord, catalog=catalog, spatial="Cone", radius=radius_arcsec * u.arcsec)
+    return Irsa.query_region(
+        coord, catalog=catalog, spatial="Cone", radius=radius_arcsec * u.arcsec
+    )
 
 
 class ZTFInteractSkyCatalogProvider(InteractSkyCatalogProvider):
@@ -142,7 +141,10 @@ class ZTFInteractSkyCatalogProvider(InteractSkyCatalogProvider):
 
         catalog = f"ztf_objects_dr{self.data_release}"
         rs = _query_cone_region(
-            self.coord.ra.to(u.deg).value, self.coord.dec.to(u.deg).value, self.radius.to(u.arcsec).value, catalog
+            self.coord.ra.to(u.deg).value,
+            self.coord.dec.to(u.deg).value,
+            self.radius.to(u.arcsec).value,
+            catalog,
         )
 
         if self.magnitude_limit is not None:
@@ -160,7 +162,9 @@ class ZTFInteractSkyCatalogProvider(InteractSkyCatalogProvider):
         rs.rename_column("dec", "DEC")
 
         # magForSize: use a constant size, to avoid dots too small for dim ones
-        rs["magForSize"] = np.full(len(rs), 15.0)  # use np.full() for empty rs edge case
+        rs["magForSize"] = np.full(
+            len(rs), 15.0
+        )  # use np.full() for empty rs edge case
 
         return rs
 
@@ -182,7 +186,9 @@ class ZTFInteractSkyCatalogProvider(InteractSkyCatalogProvider):
         ]
 
     def get_detail_view(self, data: dict) -> Tuple[dict, list]:
-        ztf_url = _to_lc_url(data["oid"], self.data_release, self.lc_format)  # the csv data
+        ztf_url = _to_lc_url(
+            data["oid"], self.data_release, self.lc_format
+        )  # the csv data
         snad_url = f"https://ztf.snad.space/view/{data['oid']}"  # a web viewer
         coordStrEncoded = urllib.parse.quote_plus(f"{data['ra']} {data['dec']}")
         zubercal_url = (
@@ -190,7 +196,7 @@ class ZTFInteractSkyCatalogProvider(InteractSkyCatalogProvider):
             f"RADec={coordStrEncoded}&Rad=0.1&PLOT=plot&IMG=ps1&FILT=filter&DB=all&.submit=Submit&OUT=csv&SHORT=short"
         )  # Zubercal PSF photometry web viewer
         oid_html = (
-            f"""{data['oid']} (<a href="{ztf_url}" title="csv data" target="_blank">LC</a>"""
+            f"""{data["oid"]} (<a href="{ztf_url}" title="csv data" target="_blank">LC</a>"""
             f""",&emsp;<a href="{snad_url}" title="SNAD web viewer" target="_blank">snad</a>"""
             f""", <a href="{zubercal_url}" title="Zubercal PSF photometry web viewer" target="_blank">Zubercal</a>)"""
         )
