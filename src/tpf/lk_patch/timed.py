@@ -11,7 +11,9 @@ def timed(msg_prefix=None, logger=log):
         msg_prefix_final = f"{func.__name__}()" if msg_prefix is None else msg_prefix
 
         def wrapper(*args, **kwargs):
-            return timed_call(func, args, kwargs, msg_prefix=msg_prefix_final, logger=logger)
+            return timed_call(
+                func, args, kwargs, msg_prefix=msg_prefix_final, logger=logger
+            )
 
         return wrapper
 

@@ -1,13 +1,12 @@
 """Provides catalog data for `tpf.interact_sky()` function"""
 
-from .core import *
-
 from . import (
     gaia_tic,
+    skypatrol2,
     vsx,
     ztf,
-    skypatrol2,
 )
+from .core import *
 
 
 def resolve_catalog_provider_class(name):

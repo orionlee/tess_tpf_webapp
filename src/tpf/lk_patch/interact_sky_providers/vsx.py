@@ -1,22 +1,18 @@
-from functools import lru_cache
 import logging
 import re
+from functools import lru_cache
 from typing import Tuple, Union
 
-
 import astropy.units as u
-
-from astropy.coordinates import SkyCoord
-from astropy.table import Table, MaskedColumn
-from astropy.time import Time
-
 import numpy as np
-
 import requests
+from astropy.coordinates import SkyCoord
+from astropy.table import MaskedColumn, Table
+from astropy.time import Time
+from lightkurve import LightkurveError
 from requests import HTTPError
 
-from lightkurve import LightkurveError
-from .core import ProperMotionCorrectionMeta, InteractSkyCatalogProvider
+from .core import InteractSkyCatalogProvider, ProperMotionCorrectionMeta
 
 log = logging.getLogger(__name__)
 
@@ -24,11 +20,15 @@ log = logging.getLogger(__name__)
 def _parse_limit_mag_uncertainty_band(text):
     # to handle case input is number (i.e., the origin astropy column is of type float)
     text = str(text)
-    if text == "--" or text == "nan":  # string  representation of np.ma.masked and nan respectively
+    if (
+        text == "--" or text == "nan"
+    ):  # string  representation of np.ma.masked and nan respectively
         return dict(l="", mag=np.nan, u="", band="")
 
     # handle text such as 12.9 V
-    matches = re.match(r"\s*(?P<l>[><]?)(?P<mag>-?\d+([.]\d+)?)(?P<u>:?)\s*(?P<band>[^\s]*)", text)
+    matches = re.match(
+        r"\s*(?P<l>[><]?)(?P<mag>-?\d+([.]\d+)?)(?P<u>:?)\s*(?P<band>[^\s]*)", text
+    )
     if matches is None:
         # parse unexpectedly failed, put the entire text in band for now
         # (as it's meant to be str)
@@ -43,10 +43,14 @@ def _parse_limit_mag_uncertainty_band(text):
 def _parse_limit_mag_amp_uncertainty_band(text):
     # to handle case input is number (i.e., the origin astropy column is of type float)
     text = str(text)
-    if text == "--" or text == "nan":  # string  representation of np.ma.masked and nan respectively
+    if (
+        text == "--" or text == "nan"
+    ):  # string  representation of np.ma.masked and nan respectively
         return dict(l="", mag=np.nan, u="", band="", a="")
 
-    no_amp_res = _parse_limit_mag_uncertainty_band(text)  # limit flag has already been extracted
+    no_amp_res = _parse_limit_mag_uncertainty_band(
+        text
+    )  # limit flag has already been extracted
     if not np.isnan(no_amp_res["mag"]):
         no_amp_res["a"] = ""
         return no_amp_res
@@ -68,7 +72,9 @@ def _parse_limit_mag_amp_uncertainty_band(text):
 def _parse_number_with_uncertainty_flag(text):
     # to handle case input is number (i.e., the origin astropy column is of type float)
     text = str(text)
-    if text == "--" or text == "nan":  # string  representation of np.ma.masked and nan respectively
+    if (
+        text == "--" or text == "nan"
+    ):  # string  representation of np.ma.masked and nan respectively
         return np.nan, ""
 
     matches = re.match(r"\s*(-?\d+([.]\d+)?)(:?)\s*", text)
@@ -161,7 +167,9 @@ def _parse_response(result):
         max_parsed = [_parse_limit_mag_uncertainty_band(v) for v in tab["MaxMag"]]
         tab["l_max"] = [t["l"] for t in max_parsed]
         tab["max"] = [t["mag"] for t in max_parsed]
-        tab["max"] = tab["max"].astype(float)  # needed in case if the parsed data has nan
+        tab["max"] = tab["max"].astype(
+            float
+        )  # needed in case if the parsed data has nan
         tab["max"].unit = u.mag
         tab["u_max"] = [t["u"] for t in max_parsed]
         tab["n_max"] = [t["band"] for t in max_parsed]
@@ -171,7 +179,9 @@ def _parse_response(result):
         min_parsed = [_parse_limit_mag_amp_uncertainty_band(v) for v in tab["MinMag"]]
         tab["l_min"] = [t["l"] for t in min_parsed]
         tab["min"] = [t["mag"] for t in min_parsed]
-        tab["min"] = tab["min"].astype(float)  # needed in case if the parsed data has nan
+        tab["min"] = tab["min"].astype(
+            float
+        )  # needed in case if the parsed data has nan
         tab["min"].unit = u.mag
         tab["f_min"] = [t["a"] for t in min_parsed]  # amplitude, Y or ""
         tab["u_min"] = [t["u"] for t in min_parsed]
@@ -214,7 +224,10 @@ def _query_cone_region(ra2000, dec2000, radius_deg, magnitude_limit=None):
                 f"HTTP {he.response.status_code} {he.response.reason} ; "
                 f"x-amzn-waf-action: {he.response.headers.get('x-amzn-waf-action')}"
             )
-            raise LightkurveError(f"Rate Limit Error ({rate_limit_err_msg}) in querying VSX with {query_url}", he)
+            raise LightkurveError(
+                f"Rate Limit Error ({rate_limit_err_msg}) in querying VSX with {query_url}",
+                he,
+            )
         else:
             raise LightkurveError(f"HTTPError in querying VSX with {query_url}", he)
     except Exception as e:
@@ -225,21 +238,21 @@ def _to_mag_text(tab):
     def _do_to_text(r):  # for one row
         if np.isnan(r["min"]):
             # no range / amplitude
-            return f'{r["l_max"]}{r["max"]}{r["u_max"]} {r["n_max"]}'
+            return f"{r['l_max']}{r['max']}{r['u_max']} {r['n_max']}"
 
         # show max - min or mag (amplitude)
         if r["n_max"] == r["n_min"]:
             # passband the same, abbreviate them to be shown only
-            n_max, n_min = "", f' {r["n_min"]}'
+            n_max, n_min = "", f" {r['n_min']}"
         else:
-            n_max, n_min = f' {r["n_max"]}', f' {r["n_min"]}'
+            n_max, n_min = f" {r['n_max']}", f" {r['n_min']}"
 
         if r["f_min"] != "Y":
             # max mag - min mag format
-            return f'{r["l_max"]}{r["max"]}{r["u_max"]}{n_max} - {r["l_min"]}{r["min"]}{r["u_min"]}{n_min}'
+            return f"{r['l_max']}{r['max']}{r['u_max']}{n_max} - {r['l_min']}{r['min']}{r['u_min']}{n_min}"
         else:
             # magnitude - amplitude format
-            return f'{r["l_max"]}{r["max"]}{r["u_max"]}{n_max}  ({r["l_min"]}{r["min"]}{r["u_min"]}){n_min}'
+            return f"{r['l_max']}{r['max']}{r['u_max']}{n_max}  ({r['l_min']}{r['min']}{r['u_min']}){n_min}"
 
     return [_do_to_text(row) for row in tab]
 
@@ -341,12 +354,16 @@ class VSXInteractSkyCatalogProvider(InteractSkyCatalogProvider):
         )
         if rs is not None:
             # use constant marker size
-            rs["magForSize"] = np.full(len(rs), 10.0)  # use np.full() for empty rs edge case
+            rs["magForSize"] = np.full(
+                len(rs), 10.0
+            )  # use np.full() for empty rs edge case
             rs["magText"] = _to_mag_text(rs)
         return rs
 
     def get_proper_motion_correction_meta(self) -> ProperMotionCorrectionMeta:
-        return ProperMotionCorrectionMeta("RAJ2000", "DEJ2000", "pmRA", "pmDE", "icrs", self.J2000)
+        return ProperMotionCorrectionMeta(
+            "RAJ2000", "DEJ2000", "pmRA", "pmDE", "icrs", self.J2000
+        )
 
     def get_tooltips(self) -> list:
         return [
@@ -367,10 +384,12 @@ class VSXInteractSkyCatalogProvider(InteractSkyCatalogProvider):
             epoch_text = ""
         else:
             # iso date, e.g. 2019-07-31, followed by HJD
-            epoch_text = Time(data["Epoch"], format="jd", scale="utc").to_value("iso", subfmt="date")
-            epoch_text += f' (HJD {data["Epoch"]})'
+            epoch_text = Time(data["Epoch"], format="jd", scale="utc").to_value(
+                "iso", subfmt="date"
+            )
+            epoch_text += f" (HJD {data['Epoch']})"
         return {
-            "Name": f"""{data['Name']} (<a href="{vsx_url}" target="_blank">VSX</a>)""",
+            "Name": f"""{data["Name"]} (<a href="{vsx_url}" target="_blank">VSX</a>)""",
             'Separation (")': f"{data['separation']:.2f}",
             "Variability type": data["Type"],
             "Magnitude": data["magText"],
@@ -381,3 +400,8 @@ class VSXInteractSkyCatalogProvider(InteractSkyCatalogProvider):
             "column": f"{data['x']:.1f}",
             "row": f"{data['y']:.1f}",
         }, None
+
+    def search(self, source: dict, term: str) -> int:
+        # OPEN: Consider search for OID as well,
+        # but the current UI does not surface OID so we leave it alone.
+        return self._search_col_as_str(source, "Name", term)

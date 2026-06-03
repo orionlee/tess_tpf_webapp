@@ -1,10 +1,10 @@
+import re
 from abc import ABC, abstractmethod
 from collections import namedtuple
-
 from typing import Tuple, Union
 
 import astropy.units as u
-
+import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy.table import Table
 
@@ -93,7 +93,9 @@ class InteractSkyCatalogProvider(ABC):
         pass
 
     def query_catalog_timed(self) -> Table:
-        return timed_call(self.query_catalog, None, None, msg_prefix=f"{self.label}:query_catalog()")
+        return timed_call(
+            self.query_catalog, None, None, msg_prefix=f"{self.label}:query_catalog()"
+        )
 
     @abstractmethod
     def get_proper_motion_correction_meta(self) -> ProperMotionCorrectionMeta:
@@ -147,3 +149,45 @@ class InteractSkyCatalogProvider(ABC):
             The list can be ``None`` if no extra information is needed.
         """
         pass
+
+    @abstractmethod
+    def search(self, source: dict, term: str) -> int:
+        """Search the data source (a dictionary of columns) for the given term.
+        Return the index of the matching row in the source, -1 if not found.
+        """
+        pass
+
+    @staticmethod
+    def _search_col_as_str(source: dict, colname: str, term: str | None) -> int:
+        """Helper to search a column of data"""
+        if term is None or term == "":
+            return -1
+        col_vals = source.get(colname)
+        if col_vals is None:
+            return -1  # OPEN: should we raise an Error instead (it usually implies there is a bug)
+        col_vals = np.asarray(col_vals, dtype=str)
+        match_indices = np.argwhere(col_vals == term)
+        if len(match_indices > 0):
+            idx = match_indices[0][0]
+            return idx
+        else:
+            return -1
+
+    @staticmethod
+    def _is_int_id(term: str) -> bool:
+        """Test if the given search term is an non-negative integer (the ID in many catalogs).
+        Helper for search() implementation.
+        """
+        return re.match(r"^\d+$", term) is not None
+
+    @staticmethod
+    def _extract_id(term: str, pattern: str) -> str | None:
+        """Extract an ID (usually an integer ID) from the search term by the given regex.
+        Return the first matching group of the regex if matched.
+        Helper for search() implementation.
+        """
+        result = re.match(pattern, term, re.IGNORECASE)
+        if result is not None:
+            return result[1]
+        else:
+            return None
