@@ -400,3 +400,8 @@ class VSXInteractSkyCatalogProvider(InteractSkyCatalogProvider):
             "column": f"{data['x']:.1f}",
             "row": f"{data['y']:.1f}",
         }, None
+
+    def search(self, source: dict, term: str) -> int:
+        # OPEN: Consider search for OID as well,
+        # but the current UI does not surface OID so we leave it alone.
+        return self._search_col_as_str(source, "Name", term)

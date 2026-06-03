@@ -66,6 +66,7 @@ try:
         Row,
         Slider,
         Span,
+        TextInput,
         VeeHead,
     )
     from bokeh.models.formatters import PrintfTickFormatter
@@ -649,7 +650,8 @@ Selected:<br>
                 msg += '<tr><td colspan="2">&nbsp;</td></tr>'  # space between multiple targets
             msg += "\n<table>"
             message_selected_target.text = msg
-        # else do nothing (not clearing the widget) for now.
+        else:  # case no selection
+            message_selected_target.text = ""
 
     source.selected.on_change("indices", show_target_info)
 
@@ -1480,6 +1482,46 @@ margin: 5px 10px;
     return select_catalog_ui
 
 
+def _create_search_star_ui(providers, ui_ctr):
+    def search_star():
+        term = in_star_search.value.strip()
+
+        def get_visible_data_source(provider):
+            # locate the renderer of the correspond catalog
+            #
+            # Note: in edge cases, the renderer may not have yet been create,
+            # as they are created asynchronously
+            catalog_renderer = ui_ctr.select_one({"name": f"catalog_{provider.label}"})
+            if catalog_renderer is None or not catalog_renderer.visible:
+                return None
+
+            return catalog_renderer.data_source
+
+        # clear all existing selection before doing search
+        for provider in providers:
+            data_source = get_visible_data_source(provider)
+            if data_source is not None:
+                data_source.selected.indices = []
+
+        for provider in reversed(providers):
+            # reverse the providers list as the last provider is at the topmost
+            # layer in the UI: more likely to be the catalog of interest
+            data_source = get_visible_data_source(provider)
+            if data_source is None:
+                continue
+            idx = provider.search(data_source.data, term)
+            if idx >= 0:
+                data_source.selected.indices = [idx]
+                break
+
+    in_star_search = TextInput(width=200, placeholder="Gaia DR3 Source, TIC ID, etc.")
+    btn_star_search = Button(label="Search", button_type="primary")
+
+    btn_star_search.on_click(search_star)
+
+    return in_star_search, btn_star_search
+
+
 def make_interact_sky_selection_elements(fig_tpf):
     # a widget that displays some of the selected star's metadata
     # so that they can be copied (e.g., GAIA ID).
@@ -1601,6 +1643,8 @@ def show_skyview_widget(
             arrow_4_selected,
         )
 
+        in_star_search, btn_star_search = _create_search_star_ui(providers, fig_tpf)
+
         # Optionally override the default title
         if tpf.mission == "K2":
             fig_tpf.title.text = (
@@ -1631,7 +1675,16 @@ def show_skyview_widget(
             select_catalog_ui = _create_select_catalog_ui(providers, fig_tpf)
             ui_ctr.children = [
                 Row(
-                    Column(fig_tpf, select_catalog_ui, stretch_slider),
+                    Column(
+                        fig_tpf,
+                        select_catalog_ui,
+                        Row(
+                            in_star_search,
+                            btn_star_search,
+                            Spacer(width=60),
+                            stretch_slider,
+                        ),
+                    ),
                     message_selected_target,
                 )
             ]

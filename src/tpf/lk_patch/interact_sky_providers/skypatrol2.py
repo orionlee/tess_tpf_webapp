@@ -254,3 +254,15 @@ class SkyPatrol2InteractSkyCatalogProvider(InteractSkyCatalogProvider):
             "column": f"{data['x']:.1f}",
             "row": f"{data['y']:.1f}",
         }, None
+
+    def search(self, source: dict, term: str) -> int:
+        def get_skypatrol2_id(term):
+            if self._is_int_id(term):
+                return term
+            return self._extract_id(
+                term, r"ASAS[-_\s]SN[-_\s](?:Sky\s*Patrol)?\s*ID\s*(\d+)"
+            )
+
+        term_to_use = get_skypatrol2_id(term)
+
+        return self._search_col_as_str(source, "asas_sn_id", term_to_use)

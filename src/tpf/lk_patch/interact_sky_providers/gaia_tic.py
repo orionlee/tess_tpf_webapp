@@ -328,6 +328,15 @@ class GaiaDR3InteractSkyCatalogProvider(VizierInteractSkyCatalogProvider):
 
         return key_vals, extra_rows
 
+    def search(self, source: dict, term: str) -> int:
+        def get_gaia_source(term):
+            if self._is_int_id(term):
+                return term
+            return self._extract_id(term, r"Gaia\s*DR3\s*(\d+)")
+
+        term_to_use = get_gaia_source(term)
+        return self._search_col_as_str(source, "Source", term_to_use)
+
 
 def _join_for_empty_right_table(left, right):
     # astropy.table.join() throws ValueError if 1 or both tables are empty
@@ -623,3 +632,15 @@ class GaiaDR3TICInteractSkyCatalogProvider(GaiaDR3InteractSkyCatalogProvider):
 
     def to_include_delta_tmag(self):
         return self.target_tic is not None
+
+    def search(self, source: dict, term: str) -> int:
+        def get_tic_id(term):
+            if self._is_int_id(term):
+                return term
+            return self._extract_id(term, r"TIC\s*(?:ID)?\s*(\d+)")
+
+        term_to_use = get_tic_id(term)
+        idx = self._search_col_as_str(source, "TIC", term_to_use)
+        if idx >= 0:
+            return idx
+        return super().search(source, term)
