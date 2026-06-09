@@ -29,7 +29,7 @@ boto3
 # Note: lightkurve includes bokeh as well,
 #       but a specific version is pinned to ensure better stability,
 #       given it is the backbone of the webapp.
-bokeh==3.9.0
+bokeh==3.9.1
 skypatrol>=0.6.16,<1.0
 
 # for clearing file cache
