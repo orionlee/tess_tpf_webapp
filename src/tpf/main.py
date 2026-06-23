@@ -1,59 +1,56 @@
-from functools import cache, lru_cache
 import logging
 import os
 import warnings
+from functools import cache, lru_cache
 
-from astropy.time import Time
 import astropy.units as u
 import astroquery.vizier as vizier
-
-import numpy as np
-
-import lightkurve as lk
-from .lk_patch.interact import (
-    show_skyview_widget,
-    prepare_lightcurve_datasource,
-    make_lightcurve_figure_elements,
-    show_interact_widget,
-)
-from .ext_gaia_tic import ExtendedGaiaDR3TICInteractSkyCatalogProvider
-from .tpf_utils import (
-    get_tpf,
-    is_tesscut,
-    has_non_science_pixels,
-    cutout_by_range,
-    create_mask_for_target,
-    create_background_per_pixel_lc,
-)
-from .lc_utils import read_lc, guess_lc_source
-
 import bokeh
-from bokeh.layouts import row, column
+import lightkurve as lk
+import numpy as np
+from astropy.time import Time
+from bokeh.layouts import column, row
 from bokeh.models import (
     Button,
-    Div,
-    TextInput,
-    Select,
-    CustomJS,
-    NumeralTickFormatter,
-    ColorBar,
-    LinearColorMapper,
     Checkbox,
-    Spacer,
-    Tooltip,
-    InlineStyleSheet,
+    ColorBar,
+    CustomJS,
+    Div,
     HelpButton,
+    InlineStyleSheet,
+    LinearColorMapper,
+    NumeralTickFormatter,
+    Select,
+    Spacer,
+    TextInput,
+    Tooltip,
 )
 from bokeh.models.dom import HTML
 from bokeh.plotting import curdoc
 
+from .ext_gaia_tic import ExtendedGaiaDR3TICInteractSkyCatalogProvider
+from .lc_utils import guess_lc_source, read_lc
+from .lk_patch.interact import (
+    make_lightcurve_figure_elements,
+    prepare_lightcurve_datasource,
+    show_interact_widget,
+    show_skyview_widget,
+)
+from .tpf_utils import (
+    create_background_per_pixel_lc,
+    create_mask_for_target,
+    cutout_by_range,
+    get_tpf,
+    has_non_science_pixels,
+    is_tesscut,
+)
 
 log = logging.getLogger(__name__)
 
 
 def set_log_level_from_env():
-    from .tpf_utils import log as tpf_utils_log
     from .lk_patch.interact import log as interact_log
+    from .tpf_utils import log as tpf_utils_log
 
     # use Python standard string constant in
     #  https://docs.python.org/3/howto/logging.html
@@ -105,7 +102,9 @@ def get_build_sha_short():
     return get_build_sha()[:8]
 
 
-@lru_cache(20)  # in a single session, users generally will inspect a handful of LCs at most.
+@lru_cache(
+    20
+)  # in a single session, users generally will inspect a handful of LCs at most.
 def _do_read_lc(url):
     """A wrapper of `read_lc()` that supports caching of lightcurves, so that
     if an users switches back and forth between a few of them
@@ -125,8 +124,12 @@ def _replace_or_append_by_name(ui_container, new_model):
         ui_container.children.append(new_model)
 
 
-def make_lc_fig(url, period=None, epoch=None, epoch_format=None, use_cmap_for_folded=False):
-    log.info(f"Plot LC: {url}, period={period}, epoch={epoch}, epoch_format={epoch_format}, use_cmap={use_cmap_for_folded}")
+def make_lc_fig(
+    url, period=None, epoch=None, epoch_format=None, use_cmap_for_folded=False
+):
+    log.info(
+        f"Plot LC: {url}, period={period}, epoch={epoch}, epoch_format={epoch_format}, use_cmap={use_cmap_for_folded}"
+    )
     try:
         lc = _do_read_lc(url)
 
@@ -158,7 +161,9 @@ def make_lc_fig(url, period=None, epoch=None, epoch_format=None, use_cmap_for_fo
             margin = 0.10 * (high - low)
             return (low - margin, high + margin)
 
-        fig_lc, vertical_line = make_lightcurve_figure_elements(lc, lc_source, ylim_func=ylim_func)
+        fig_lc, vertical_line = make_lightcurve_figure_elements(
+            lc, lc_source, ylim_func=ylim_func
+        )
         fig_lc.name = "lc_fig"
         # Customize the plot
         vertical_line.visible = False
@@ -191,11 +196,21 @@ def make_lc_fig(url, period=None, epoch=None, epoch_format=None, use_cmap_for_fo
         if isinstance(lc, lk.FoldedLightCurve) and use_cmap_for_folded:
             # for phase plot, add color to circles to signify time
             time_cmap = LinearColorMapper(
-                palette="Viridis256", low=min(lc_source.data["time_original"]), high=max(lc_source.data["time_original"])
+                palette="Viridis256",
+                low=min(lc_source.data["time_original"]),
+                high=max(lc_source.data["time_original"]),
             )
-            r_lc_circle.glyph.fill_color = dict(field="time_original", transform=time_cmap)
-            r_lc_circle.nonselection_glyph.fill_color = dict(field="time_original", transform=time_cmap)
-            color_bar = ColorBar(color_mapper=time_cmap, location=(0, 0), formatter=NumeralTickFormatter(format="0,0"))
+            r_lc_circle.glyph.fill_color = dict(
+                field="time_original", transform=time_cmap
+            )
+            r_lc_circle.nonselection_glyph.fill_color = dict(
+                field="time_original", transform=time_cmap
+            )
+            color_bar = ColorBar(
+                color_mapper=time_cmap,
+                location=(0, 0),
+                formatter=NumeralTickFormatter(format="0,0"),
+            )
             fig_lc.add_layout(color_bar, "right")
             fig_lc.width += 100  # extra horizontal space for the color bar
         elif "phot_filter" in lc.colnames:
@@ -213,17 +228,25 @@ def make_lc_fig(url, period=None, epoch=None, epoch_format=None, use_cmap_for_fo
             r_lc_circle.nonselection_glyph.fill_color = "fill_color"
 
         # enable box_zoom_tool by default
-        box_zoom_tools = [t for t in fig_lc.toolbar.tools if isinstance(t, bokeh.models.BoxZoomTool)]
-        fig_lc.toolbar.active_drag = box_zoom_tools[0] if len(box_zoom_tools) > 0 else "auto"
+        box_zoom_tools = [
+            t for t in fig_lc.toolbar.tools if isinstance(t, bokeh.models.BoxZoomTool)
+        ]
+        fig_lc.toolbar.active_drag = (
+            box_zoom_tools[0] if len(box_zoom_tools) > 0 else "auto"
+        )
 
         return fig_lc
     except Exception as e:
         if isinstance(e, IOError):
             # usually some issues in network or ZTF server, nothing can be done on our end
-            log.warning(f"IOError (likely intermittent) of type {type(e).__name__} in loading ZTF lc: {url}")
+            log.warning(
+                f"IOError (likely intermittent) of type {type(e).__name__} in loading ZTF lc: {url}"
+            )
         else:
             # other unexpected errors that might mean bugs on our end.
-            log.error(f"Error of type {type(e).__name__} in loading lc: {url}", exc_info=True)
+            log.error(
+                f"Error of type {type(e).__name__} in loading lc: {url}", exc_info=True
+            )
         # traceback.print_exc()  # for server side debug
         err_msg = f"Error in loading lightcurve. {type(e).__name__}: {e}"
         if guess_lc_source(url) is None:
@@ -252,19 +275,25 @@ def create_lc_viewer_ui():
         # value="1.651",  # TST
     )
 
-    in_epoch = TextInput(width=120, placeholder="optional")  # slightly wider, to (long) accommodate JD value
+    in_epoch = TextInput(
+        width=120, placeholder="optional"
+    )  # slightly wider, to (long) accommodate JD value
 
     in_epoch_format = Select(options=[("btjd", "BTJD"), ("hjd", "HJD")], value="btjd")
 
     btn_period_half = Button(label="1/2 P")
     btn_period_double = Button(label="2x P")
 
-    in_use_cmap_for_folded = Checkbox(label="Use color map to show time in phase plot", active=False)
+    in_use_cmap_for_folded = Checkbox(
+        label="Use color map to show time in phase plot", active=False
+    )
     btn_plot = Button(label="Plot", button_type="primary")
 
     ui_layout = column(
         Div(text="<hr>"),  # a spacer
-        Div(text="<h3>Lightcurve<span style='font-weight: normal; font-size: 90%;'> from ZTF or SkyPatrol v2</span></h3>"),
+        Div(
+            text="<h3>Lightcurve<span style='font-weight: normal; font-size: 90%;'> from ZTF or SkyPatrol v2</span></h3>"
+        ),
         row(Div(text="URL *"), in_url),
         row(
             Div(text="Period (d)"),
@@ -342,7 +371,9 @@ transform: rotate({-deg_from_north}deg);transform-origin: left; cursor:pointer;"
 </div>"""
 
 
-def create_skyview_metadata_ui(tpf, ztf_search_radius, ztf_ngoodobsrel_min, skypatrol2_search_radius):
+def create_skyview_metadata_ui(
+    tpf, ztf_search_radius, ztf_ngoodobsrel_min, skypatrol2_search_radius
+):
     if tpf is None:
         return Div(name="skyview_metadata", text="")
 
@@ -386,6 +417,7 @@ or Collateral (Non-science) Pixels section in
 def export_plt_fig_as_data_uri(fig, close_fig=True):
     import base64
     from io import BytesIO
+
     import matplotlib.pyplot as plt
 
     try:
@@ -426,7 +458,9 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
 
     in_flux_normalized = Checkbox(label="normalized", active=True)
     # optional for Tesscut, an approximate background subtracted for quick look
-    in_bkg_subtraction = Checkbox(label="background subtracted", visible=is_tesscut(tpf), active=False)
+    in_bkg_subtraction = Checkbox(
+        label="background subtracted", visible=is_tesscut(tpf), active=False
+    )
     in_ymin = TextInput(width=100, placeholder="optional")
     in_ymax = TextInput(width=100, placeholder="optional")
 
@@ -456,7 +490,9 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
     # add interactivity
     async def add_tpf_interact_fig():
 
-        log.info(f"Plot tpf interact: {tpf}, sector={tpf.meta.get('SECTOR')}, TessCut={is_tesscut(tpf)}")
+        log.info(
+            f"Plot tpf interact: {tpf}, sector={tpf.meta.get('SECTOR')}, TessCut={is_tesscut(tpf)}"
+        )
 
         # provide background LC via a memoized function so that
         # 1. it won't be unnecessarily created, and 2. if it's needed, it'll be created once only.
@@ -503,7 +539,9 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
         # for TessCut, set the initial aperture mask to be the single pixel where the target is located
         # the behavior would be more consistent than using the threshold mask,
         # which might not be referring to the target at all.
-        aperture_mask = create_mask_for_target(tpf) if is_tesscut(tpf) else tpf.pipeline_mask
+        aperture_mask = (
+            create_mask_for_target(tpf) if is_tesscut(tpf) else tpf.pipeline_mask
+        )
 
         # ^^^ for transform_func() and ylim_func()
         #     read users input during execution (inside function body)
@@ -513,7 +551,7 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
 
         # a more friendly fits filename than the default, useful in notebook env
         exported_filename = (
-            f'tess-tic{tpf.meta.get("TICID")}-s{tpf.meta.get("SECTOR", 0):04}'
+            f"tess-tic{tpf.meta.get('TICID')}-s{tpf.meta.get('SECTOR', 0):04}"
             f"-{tpf.flux.shape[1]}x{tpf.flux.shape[2]}_astrocut-custom-lc.fits"
         )
         create_tpf_interact_ui_func, interact_mask = show_interact_widget(
@@ -533,10 +571,18 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
         try:
             # fig_lc is also used by ylim_func above
             fig_lc = ui_body.select_one({"name": "fig_lc"})
-            box_zoom_tools = [t for t in fig_lc.toolbar.tools if isinstance(t, bokeh.models.BoxZoomTool)]
-            fig_lc.toolbar.active_drag = box_zoom_tools[0] if len(box_zoom_tools) > 0 else "auto"
+            box_zoom_tools = [
+                t
+                for t in fig_lc.toolbar.tools
+                if isinstance(t, bokeh.models.BoxZoomTool)
+            ]
+            fig_lc.toolbar.active_drag = (
+                box_zoom_tools[0] if len(box_zoom_tools) > 0 else "auto"
+            )
         except Exception as e:
-            warnings.warn(f"Failed to enable box zoom as default for tpf.interact() LC viewer. {e}")
+            warnings.warn(
+                f"Failed to enable box zoom as default for tpf.interact() LC viewer. {e}"
+            )
 
         # use the x/y zoom range of the SkyView TPF as the default, if available
         if fig_tpf_skyview is not None:
@@ -552,7 +598,9 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
                 btn_save_lc.visible = False
 
         # add UI and functions for per-pixel plot
-        btn_plot_per_pixels = Button(label="Per-Pixel Plot", button_type="success")  # "success" to signify secondary
+        btn_plot_per_pixels = Button(
+            label="Per-Pixel Plot", button_type="success"
+        )  # "success" to signify secondary
         out_plot_per_pixels = Div(text="", name="per_pixel_plot_fig")
 
         ui_body.children.append(row(btn_plot_per_pixels, out_plot_per_pixels))
@@ -573,9 +621,17 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
 
             # cut tpf to the pixel range (columns/rows) in `interact` figure
             fig_tpf = ui_body.select_one({"name": "fig_tpf"})
-            row_range = round(fig_tpf.y_range.start - (tpf.row - 0.5)), round(fig_tpf.y_range.end - (tpf.row - 0.5))
-            col_range = round(fig_tpf.x_range.start - (tpf.column - 0.5)), round(fig_tpf.x_range.end - (tpf.column - 0.5))
-            tpf_trunc, aperture_mask_trunc = cutout_by_range(tpf_trunc, interact_mask.copy(), col_range, row_range)
+            row_range = (
+                round(fig_tpf.y_range.start - (tpf.row - 0.5)),
+                round(fig_tpf.y_range.end - (tpf.row - 0.5)),
+            )
+            col_range = (
+                round(fig_tpf.x_range.start - (tpf.column - 0.5)),
+                round(fig_tpf.x_range.end - (tpf.column - 0.5)),
+            )
+            tpf_trunc, aperture_mask_trunc = cutout_by_range(
+                tpf_trunc, interact_mask.copy(), col_range, row_range
+            )
 
             @cache
             def get_bkg_per_pixel_lc_trunc():
@@ -601,12 +657,16 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
                 scale = 2.0 / plot_duration
                 return pixel_size_inches * scale
 
-            markersize = round(get_default_marker_size_for_pixels_plot(tpf_trunc, pixel_size_inches), 1)
+            markersize = round(
+                get_default_marker_size_for_pixels_plot(tpf_trunc, pixel_size_inches), 1
+            )
             if markersize < 0.05:
                 markersize = 0.05
 
             shape = tpf_trunc.flux[0].shape
-            fig = plt.figure(figsize=(shape[1] * pixel_size_inches, shape[0] * pixel_size_inches))
+            fig = plt.figure(
+                figsize=(shape[1] * pixel_size_inches, shape[0] * pixel_size_inches)
+            )
             try:
                 ax = tpf_trunc.plot_pixels(
                     ax=fig.gca(),
@@ -761,9 +821,15 @@ async def create_app_body_ui(doc, tic, sector, magnitude_limit=None):
     try:
         tic = None if tic is None or tic == "" else int(tic)
         sector = None if sector is None or sector == "" else int(sector)
-        magnitude_limit = None if magnitude_limit is None or magnitude_limit == "" else float(magnitude_limit)
+        magnitude_limit = (
+            None
+            if magnitude_limit is None or magnitude_limit == ""
+            else float(magnitude_limit)
+        )
     except Exception as err:
-        return Div(text=f"<h3>Skyview</h3> Invalid Parameter. Error: {err}", name="skyview"), None
+        return Div(
+            text=f"<h3>Skyview</h3> Invalid Parameter. Error: {err}", name="skyview"
+        ), None
 
     if tic is None:
         return (
@@ -787,10 +853,15 @@ async def create_app_body_ui(doc, tic, sector, magnitude_limit=None):
 
     if tpf is None:
         log.debug(f"Cannot find TPF or TESSCut for {msg_label}. No plot to be made.")
-        return Div(text=f"<h3>SkyView</h3> Cannot find Pixel data for {msg_label}", name="skyview"), None
+        return Div(
+            text=f"<h3>SkyView</h3> Cannot find Pixel data for {msg_label}",
+            name="skyview",
+        ), None
 
     # set at info level, as it might be useful to gather statistics on the type of tpfs being plotted ()
-    log.info(f"Plot Skyview: {tpf}, sector={tpf.meta.get('SECTOR')}, exptime={sr.exptime[-1]}, TessCut={is_tesscut(tpf)}")
+    log.info(
+        f"Plot Skyview: {tpf}, sector={tpf.meta.get('SECTOR')}, exptime={sr.exptime[-1]}, TessCut={is_tesscut(tpf)}"
+    )
     return await create_app_body_ui_from_tpf(doc, tpf, magnitude_limit=magnitude_limit)
 
 
@@ -856,7 +927,10 @@ async def create_app_body_ui_from_tpf(doc, tpf, magnitude_limit=None, catalogs=N
             ),
         ),
         skypatrol2=("skypatrol2", dict(radius=skypatrol2_search_radius)),
-        ztf=("ztf", dict(radius=ztf_search_radius, ngoodobsrel_min=ztf_ngoodobsrel_min)),
+        ztf=(
+            "ztf",
+            dict(radius=ztf_search_radius, ngoodobsrel_min=ztf_ngoodobsrel_min),
+        ),
         vsx="vsx",
     )
 
@@ -864,7 +938,11 @@ async def create_app_body_ui_from_tpf(doc, tpf, magnitude_limit=None, catalogs=N
 
     with warnings.catch_warnings():
         # Ignore warnings about no PM correction (happened to TessCut data)
-        warnings.filterwarnings("ignore", message="Proper motion correction cannot", category=lk.LightkurveWarning)
+        warnings.filterwarnings(
+            "ignore",
+            message="Proper motion correction cannot",
+            category=lk.LightkurveWarning,
+        )
 
         create_skyview_ui = show_skyview_widget(
             tpf_skyview,
@@ -885,7 +963,10 @@ async def create_app_body_ui_from_tpf(doc, tpf, magnitude_limit=None, catalogs=N
                     ztf_ngoodobsrel_min=ztf_ngoodobsrel_min,
                     skypatrol2_search_radius=skypatrol2_search_radius,
                 ),
-                create_tpf_interact_ui(tpf, fig_tpf_skyview=skyview_ui.select_one({"name": "fig_tpf_skyview"})),
+                create_tpf_interact_ui(
+                    tpf,
+                    fig_tpf_skyview=skyview_ui.select_one({"name": "fig_tpf_skyview"}),
+                ),
                 create_lc_viewer_ui(),
                 # the name is used to signify an interactive UI is returned
                 # (as opposed to the UI with a dummy UI or error message in the boundary conditions)
@@ -940,7 +1021,9 @@ def show_app(tic, sector, magnitude_limit=None):
 
         ui_main = ui_ctr.select_one({"name": "app_main"})
         try:
-            ui_body, catalog_plot_fns = await create_app_body_ui(doc, tic, sector, magnitude_limit=magnitude_limit)
+            ui_body, catalog_plot_fns = await create_app_body_ui(
+                doc, tic, sector, magnitude_limit=magnitude_limit
+            )
         except Exception as e:
             if isinstance(e, IOError):
                 # usually some issues in network or MAST server, nothing can be done on our end
@@ -956,7 +1039,8 @@ def show_app(tic, sector, magnitude_limit=None):
             else:
                 # unexpected errors that might mean bugs on our end.
                 log.error(
-                    f"Error of type {type(e).__name__} in creating Inspector for TIC {tic}, sector {sector}", exc_info=True
+                    f"Error of type {type(e).__name__} in creating Inspector for TIC {tic}, sector {sector}",
+                    exc_info=True,
                 )
                 err_msg = f"Error in creating Inspector. {type(e).__name__}: {e}"
             ui_body = Div(text=err_msg)
@@ -990,7 +1074,7 @@ def show_in_notebook(ui, notebook_url="localhost:8888"):
     to show the UI of ``create_app_body_ui_from_tpf()``.
     """
 
-    from bokeh.io import show, output_notebook
+    from bokeh.io import output_notebook, show
 
     def do_show(doc):
         if callable(ui):  # case actually a function
@@ -1003,7 +1087,9 @@ def show_in_notebook(ui, notebook_url="localhost:8888"):
     return show(do_show, notebook_url=notebook_url)
 
 
-def show_in_notebook_app_body_ui_from_tpf(tpf, magnitude_limit=None, catalogs=None, notebook_url="localhost:8888"):
+def show_in_notebook_app_body_ui_from_tpf(
+    tpf, magnitude_limit=None, catalogs=None, notebook_url="localhost:8888"
+):
     """Helper for use in Jupyter notebook to show `create_app_body_ui_from_tpf()`."""
 
     def create_app_body_ui_from_tpf_wrapper(doc):
@@ -1016,7 +1102,9 @@ def show_in_notebook_app_body_ui_from_tpf(tpf, magnitude_limit=None, catalogs=No
 
         doc.add_next_tick_callback(do_create)
 
-    return show_in_notebook(create_app_body_ui_from_tpf_wrapper, notebook_url=notebook_url)
+    return show_in_notebook(
+        create_app_body_ui_from_tpf_wrapper, notebook_url=notebook_url
+    )
 
 
 #
@@ -1059,7 +1147,9 @@ if __name__.startswith("bokeh_app_"):  # invoked from `bokeh serve`
     magnitude_limit = get_arg_as_float(args, "magnitude_limit", None)
     # log bokeh session ID to make the log easier to correlate but logs generated by bokeh server
     session_id = curdoc().session_context.id
-    log.debug(f"Parameters: , {tic}, {sector}, {magnitude_limit} ; {args} . session '{session_id}'")
+    log.debug(
+        f"Parameters: , {tic}, {sector}, {magnitude_limit} ; {args} . session '{session_id}'"
+    )
 
     curdoc().title = "TESS Target Pixels Inspector"
     show_app(tic, sector, magnitude_limit)
