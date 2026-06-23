@@ -868,7 +868,7 @@ async def create_app_body_ui(doc, tic, sector, magnitude_limit=None):
 def get_default_catalogs_from_env():
     catalogs_str = os.environ.get("TESS_TPF_WEBAPP_CATALOGS", "")
     if catalogs_str.strip() == "":
-        catalogs_str = "gaiadr3_tic,skypatrol2,ztf,vsx"
+        catalogs_str = "skypatrol2,ztf,vsx,gaiadr3_tic"
     return [cat.strip() for cat in catalogs_str.split(",")]
 
 
