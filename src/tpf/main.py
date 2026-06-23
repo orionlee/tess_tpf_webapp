@@ -751,6 +751,14 @@ def create_search_form(tic, sector, magnitude_limit):
             padding: 4px;
             margin-bottom: 10px;
         }
+        #ext-links-ctr {
+            margin-top: 1em;
+            padding-left: 10px;
+            padding-right: 16px;
+        }
+        #ext-links-ctr li {
+            margin-left: -16px;
+        }
         footer {
             margin-top: 3em;
             font-size: 90%;
@@ -764,10 +772,8 @@ def create_search_form(tic, sector, magnitude_limit):
         }
     </style>
 """
-    return column(
-        Div(
-            text=f"""
-{css_text}
+
+    search_form_html = f"""
 <div id="search-form-ctr">
     <form>
         TIC *<br>
@@ -779,6 +785,27 @@ def create_search_form(tic, sector, magnitude_limit):
         <input type="submit" value="Show">
     </form>
 </div>
+"""
+
+    # include external links if a TIC is specified
+    include_ext_links = tic is not None and len(str(tic).strip()) > 0
+    ext_links_html = ""
+    if include_ext_links:
+        ext_links_html = f"""
+<div id="ext-links-ctr">
+    <p>See also:
+        <svg style="height: 1em; width: 1em;" class="svg-inline--fa fa-external-link-alt fa-w-18" aria-hidden="true" data-prefix="fas" data-icon="external-link-alt" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512" data-fa-i2svg=""><path fill="currentColor" d="M576 24v127.984c0 21.461-25.96 31.98-40.971 16.971l-35.707-35.709-243.523 243.523c-9.373 9.373-24.568 9.373-33.941 0l-22.627-22.627c-9.373-9.373-9.373-24.569 0-33.941L442.756 76.676l-35.703-35.705C391.982 25.9 402.656 0 424.024 0H552c13.255 0 24 10.745 24 24zM407.029 270.794l-16 16A23.999 23.999 0 0 0 384 303.765V448H64V128h264a24.003 24.003 0 0 0 16.97-7.029l16-16C376.089 89.851 365.381 64 344 64H48C21.49 64 0 85.49 0 112v352c0 26.51 21.49 48 48 48h352c26.51 0 48-21.49 48-48V287.764c0-21.382-25.852-32.09-40.971-16.97z"></path></svg>
+    </p>
+    <ul>
+        <li><a href="https://exofop.ipac.caltech.edu/tess/target.php?id={tic}"
+               target="_blank">ExoFOP</a></li>
+        <li><a href="https://heasarc.gsfc.nasa.gov/wsgi-scripts/TESS/TESS-point_Web_Tool/TESS-point_Web_Tool/wtv_v2.0.py/TICID_result/ticid={tic}"
+               target="_blank">Sector Visibility</a></li>
+    </ul>
+</div>
+"""
+
+    footer_html = f"""
 <footer>
     Build:
     <a target="_blank" href="https://github.com/orionlee/tess_tpf_webapp/commit/{get_build_sha()}"
@@ -797,6 +824,14 @@ def create_search_form(tic, sector, magnitude_limit):
         </ul>
     </details>
 </footer>
+"""
+    return column(
+        Div(
+            text=f"""
+{css_text}
+{search_form_html}
+{ext_links_html}
+{footer_html}
 """
         ),
         name="app_search",
