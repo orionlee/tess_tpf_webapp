@@ -1517,6 +1517,11 @@ def _create_search_star_ui(providers, ui_ctr):
     in_star_search = TextInput(width=200, placeholder="Gaia DR3 Source, TIC ID, etc.")
     btn_star_search = Button(label="Search", button_type="primary")
 
+    # note: use an explicit button to initiate the search
+    # considered use `in_star_search.on_change("value", callback)`
+    # but abandoned it because it gets triggered only when
+    # the input box lost the focus.
+    # The keyboard Enter does not trigger it.
     btn_star_search.on_click(search_star)
 
     return in_star_search, btn_star_search
