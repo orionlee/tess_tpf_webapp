@@ -315,7 +315,7 @@ def get_lightcurve_y_limits(lc_source):
     return low - margin, high + margin
 
 
-def make_lightcurve_figure_elements(lc, lc_source, ylim_func=None, fig_name="fig_lc"):
+def make_lightcurve_figure_elements(lc, lc_source, ylim_func=None, plot_scatter_only=False, fig_name="fig_lc"):
     """Make the lightcurve figure elements.
 
     Parameters
@@ -380,7 +380,7 @@ def make_lightcurve_figure_elements(lc, lc_source, ylim_func=None, fig_name="fig
     fig.y_range = Range1d(start=ylims[0], end=ylims[1])
 
     # Add step lines, circles, and hover-over tooltips
-    fig.step(
+    r_step = fig.step(
         "time",
         "flux",
         line_width=1,
@@ -389,7 +389,8 @@ def make_lightcurve_figure_elements(lc, lc_source, ylim_func=None, fig_name="fig
         nonselection_line_color="gray",
         nonselection_line_alpha=1.0,
     )
-    circ = fig.scatter(
+    r_step.name = "lc_step"  # let callers access it by name
+    r_circle = fig.scatter(
         "time",
         "flux",
         source=lc_source,
@@ -406,6 +407,7 @@ def make_lightcurve_figure_elements(lc, lc_source, ylim_func=None, fig_name="fig
         hover_alpha=0.9,
         hover_line_color="white",
     )
+    r_circle.name = "lc_circle"  # let callers access it by name
     if hasattr(lc.time, "format"):
         tooltips = [
             ("Cadence", "@cadence"),
@@ -426,7 +428,7 @@ def make_lightcurve_figure_elements(lc, lc_source, ylim_func=None, fig_name="fig
     fig.add_tools(
         HoverTool(
             tooltips=tooltips,
-            renderers=[circ],
+            renderers=[r_circle],
             mode="mouse",
             point_policy="snap_to_data",
         )
@@ -441,6 +443,16 @@ def make_lightcurve_figure_elements(lc, lc_source, ylim_func=None, fig_name="fig
         line_alpha=0.5,
     )
     fig.add_layout(vertical_line)
+
+    if plot_scatter_only:
+        # make the plot scatter like instead of lines
+        r_step.visible = False
+
+        r_circle.glyph.fill_color = "gray"
+        r_circle.glyph.fill_alpha = 1.0
+        r_circle.nonselection_glyph.fill_color = "gray"
+        r_circle.nonselection_glyph.fill_alpha = 1.0
+        r_circle.glyph.size = 4
 
     return fig, vertical_line
 
@@ -1091,6 +1103,7 @@ def show_interact_widget(
     vmax=None,
     scale="log",
     cmap="Viridis256",
+    lc_plot_scatter_only=False,
     return_type=None,
     also_return_selection_mask=False,
 ):
@@ -1231,7 +1244,10 @@ def show_interact_widget(
 
         # Create the lightcurve figure and its vertical marker
         fig_lc, vertical_line = make_lightcurve_figure_elements(
-            lc, lc_source, ylim_func=ylim_func
+            lc,
+            lc_source,
+            ylim_func=ylim_func,
+            plot_scatter_only=lc_plot_scatter_only,
         )
 
         # Create the TPF figure and its stretch slider
