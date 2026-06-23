@@ -1,15 +1,13 @@
 import logging
 import os
 import sys
-import time
 import threading
+import time
 import traceback
 
-import psutil
-
-import lightkurve as lk
 import astropy
-
+import lightkurve as lk
+import psutil
 
 log = logging.getLogger(__name__)
 _FILECACHE_TTL_MINS = -1
@@ -78,7 +76,8 @@ def _rm_files_by_atime(basedir, atime_threshold, dry_run=False):
                 elif filepath in proc_open_files:
                     # the intent is to keep TPF FITS files that are still opened / used by bokeh
                     log.debug(
-                        f"_rm_files_by_atime() retained file '{filepath}' because " "it is still being opened by the process."
+                        f"_rm_files_by_atime() retained file '{filepath}' because "
+                        "it is still being opened by the process."
                     )
                 else:
                     # pass all check. remove it
@@ -93,7 +92,10 @@ def _get_ttl_mins_from_env():
     try:
         ttl = int(ttl_str)
     except Exception as e:
-        log.warning(f"Invalid value for env var `TESS_TPF_FILECACHE_TTL`: {ttl_str}, Use -1. ", e)
+        log.warning(
+            f"Invalid value for env var `TESS_TPF_FILECACHE_TTL`: {ttl_str}, Use -1. ",
+            e,
+        )
 
     if ttl < 0 and os.environ.get("K_SERVICE", None) is not None:
         # we always apply a TTL in Google Cloud Run, as the file system is memory,
@@ -103,7 +105,9 @@ def _get_ttl_mins_from_env():
         # The var `K_SERVICE` is defined in:
         # https://cloud.google.com/run/docs/container-contract#env-vars
         ttl = 15
-        log.debug(f"In Google Cloud Run, tess-tpf file cache. No value specified. Fallbacks to the default {ttl}")
+        log.debug(
+            f"In Google Cloud Run, tess-tpf file cache. No value specified. Fallbacks to the default {ttl}"
+        )
     return ttl
 
 
@@ -113,7 +117,9 @@ _LOCK_CLEAR_OLD_CACHE_ENTRY = threading.Lock()
 def _clear_old_cache_entry(ttl_mins):
     def log_clear_file_cache_results(msg_prefix, files_removed, total_num_files):
         files_removed_abbrev = [os.path.basename(f) for f in files_removed]
-        log.debug(f"{msg_prefix}: removed {len(files_removed)} / {total_num_files} . {files_removed_abbrev}")
+        log.debug(
+            f"{msg_prefix}: removed {len(files_removed)} / {total_num_files} . {files_removed_abbrev}"
+        )
 
     if ttl_mins < 0:
         return
@@ -127,12 +133,22 @@ def _clear_old_cache_entry(ttl_mins):
             "%Y-%m-%d %H:%M:%S %z",
             time.localtime(atime_threshold),
         )
-        log.debug(f"_clear_old_cache_entry(): ttl={ttl_mins}, or threshold={atime_threshold_str}")
+        log.debug(
+            f"_clear_old_cache_entry(): ttl={ttl_mins}, or threshold={atime_threshold_str}"
+        )
 
-        lk_files_removed, lk_total_num_files = _rm_files_by_atime(lk.config.get_cache_dir(), atime_threshold)
-        log_clear_file_cache_results("Lightkurve cache", lk_files_removed, lk_total_num_files)
-        ap_files_removed, ap_total_num_files = _rm_files_by_atime(astropy.config.get_cache_dir(), atime_threshold)
-        log_clear_file_cache_results("astropy    cache", ap_files_removed, ap_total_num_files)
+        lk_files_removed, lk_total_num_files = _rm_files_by_atime(
+            lk.config.get_cache_dir(), atime_threshold
+        )
+        log_clear_file_cache_results(
+            "Lightkurve cache", lk_files_removed, lk_total_num_files
+        )
+        ap_files_removed, ap_total_num_files = _rm_files_by_atime(
+            astropy.config.get_cache_dir(), atime_threshold
+        )
+        log_clear_file_cache_results(
+            "astropy    cache", ap_files_removed, ap_total_num_files
+        )
         # OPEN: clear in-memory cache from lk.search_targetpixelfile, lk.search_tesscut
         # - no easy way to do it other than clear all, given
         #   it's configured with unlimited cache with no TTL at lightkurve level

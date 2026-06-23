@@ -1,13 +1,11 @@
 import re
 import warnings
 
-from astropy.time import Time
 import astropy.units as u
-from astropy.table import Table
-
-import numpy as np
-
 import lightkurve as lk
+import numpy as np
+from astropy.table import Table
+from astropy.time import Time
 
 from .lk_patch.interact_sky_providers.skypatrol2 import get_lightcurve
 
@@ -49,7 +47,10 @@ def read_ztf_csv(
         filtered = tab[np.isfinite(tab[colname])]
         num_rows_filtered = len(tab) - len(filtered)
         if num_rows_filtered > 0:
-            warnings.warn(f"{num_rows_filtered} skipped because they do not have valid time values.", lk.LightkurveWarning)
+            warnings.warn(
+                f"{num_rows_filtered} skipped because they do not have valid time values.",
+                lk.LightkurveWarning,
+            )
         return filtered
 
     tab = Table.read(
@@ -89,7 +90,9 @@ def read_ztf_csv(
         }
     )
 
-    oid_match = re.search(r"https://irsa.ipac.caltech.edu/cgi-bin/ZTF/nph_light_curves.+ID=(\d+)", url)
+    oid_match = re.search(
+        r"https://irsa.ipac.caltech.edu/cgi-bin/ZTF/nph_light_curves.+ID=(\d+)", url
+    )
     if oid_match is not None:
         id = f"ZTF OID {oid_match[1]}"  # include data release number too?
         lc.meta["OBJECT"] = id

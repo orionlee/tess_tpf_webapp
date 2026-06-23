@@ -20,7 +20,6 @@ if os.environ.get("MAST_ENABLE_CLOUD_DATASET", True):
 
     Observations.enable_cloud_dataset()
 
-
 LK_SEARCH_NUM_RETRIES = os.environ.get("LK_SEARCH_NUM_RETRIES", 4)
 
 # use tpf_utils.log instance so that retry warning would show up in gcloud log

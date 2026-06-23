@@ -1,10 +1,11 @@
-from typing import Tuple
-
 import urllib
+from typing import Tuple
 
 import astroquery.vizier as vizier
 
-from .lk_patch.interact_sky_providers.gaia_tic import GaiaDR3TICInteractSkyCatalogProvider
+from .lk_patch.interact_sky_providers.gaia_tic import (
+    GaiaDR3TICInteractSkyCatalogProvider,
+)
 
 
 def _del_all_after(dict_obj, key):
@@ -20,7 +21,9 @@ def _del_all_after(dict_obj, key):
             key_found = True
 
 
-class ExtendedGaiaDR3TICInteractSkyCatalogProvider(GaiaDR3TICInteractSkyCatalogProvider):
+class ExtendedGaiaDR3TICInteractSkyCatalogProvider(
+    GaiaDR3TICInteractSkyCatalogProvider
+):
     """Custom extension to standard Gaia DR3 TIC provider."""
 
     def get_detail_view(self, data: dict) -> Tuple[dict, list]:
@@ -29,7 +32,9 @@ class ExtendedGaiaDR3TICInteractSkyCatalogProvider(GaiaDR3TICInteractSkyCatalogP
         if key_vals["Source"] == "":
             # case the entry has no Gaia DR3 match, simplify it
             # by removing a bunch of Gaia specific entries
-            _del_all_after(key_vals, "row")  # entries after row are all Gaia DR3 values.
+            _del_all_after(
+                key_vals, "row"
+            )  # entries after row are all Gaia DR3 values.
             return key_vals, extra_rows
 
         # case it has Gaia DR3 match, add additional data
