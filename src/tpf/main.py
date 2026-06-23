@@ -162,7 +162,10 @@ def make_lc_fig(
             return (low - margin, high + margin)
 
         fig_lc, vertical_line = make_lightcurve_figure_elements(
-            lc, lc_source, ylim_func=ylim_func
+            lc,
+            lc_source,
+            ylim_func=ylim_func,
+            plot_scatter_only=True,
         )
         fig_lc.name = "lc_fig"
         # Customize the plot
@@ -180,19 +183,9 @@ def make_lc_fig(
             ystart, yend = fig_lc.y_range.start, fig_lc.y_range.end
             fig_lc.y_range.start, fig_lc.y_range.end = yend, ystart
 
-        # make the plot scatter like instead of lines
-        # hack: assume the renderers are in specific order
-        #       can be avoided if the renderers have name when they are created.
-        # r_lc_step = [r for r in fig_lc.renderers if r.name == "lc_step"][0]
-        r_lc_step = fig_lc.renderers[0]
-        r_lc_step.visible = False
-
-        # r_lc_circle = [r for r in fig_lc.renderers if r.name == "lc_circle"][0]
-        r_lc_circle = fig_lc.renderers[1]
-        r_lc_circle.glyph.fill_color = "gray"
-        r_lc_circle.glyph.fill_alpha = 1.0
-        r_lc_circle.nonselection_glyph.fill_color = "gray"
-        r_lc_circle.nonselection_glyph.fill_alpha = 1.0
+        # customize the scatter plot
+        r_lc_circle = [r for r in fig_lc.renderers if r.name == "lc_circle"][0]
+        r_lc_circle.glyph.size = 8  # larger circle given the data tend to be sparse
         if isinstance(lc, lk.FoldedLightCurve) and use_cmap_for_folded:
             # for phase plot, add color to circles to signify time
             time_cmap = LinearColorMapper(
@@ -436,7 +429,9 @@ def export_plt_fig_as_data_uri(fig, close_fig=True):
             plt.close(fig)
 
 
-def create_tpf_interact_ui(tpf, fig_tpf_skyview=None, hide_save_to_local_btn=True):
+def create_tpf_interact_ui(
+    tpf, fig_tpf_skyview=None, lc_plot_scatter_only=True, hide_save_to_local_btn=True
+):
     btn_inspect = Button(label="Inspect", button_type="primary")
     btn_help_inspect = HelpButton(
         tooltip=Tooltip(
@@ -559,6 +554,7 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
             ylim_func=ylim_func,
             transform_func=transform_func,
             aperture_mask=aperture_mask,
+            lc_plot_scatter_only=lc_plot_scatter_only,
             return_type="doc_init_fn",
             also_return_selection_mask=True,
             exported_filename=exported_filename,
