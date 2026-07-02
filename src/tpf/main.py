@@ -72,6 +72,32 @@ def set_log_timed_from_env():
     return log_timed
 
 
+def create_data_cache_dirs_from_env():
+    """Create data cache directories specified in the environment if specified.
+    The use case is to create the directories on a
+    fresh ephemeral disk (without the needed directories)
+    in Google Cloud Run environment.
+
+    https://docs.cloud.google.com/run/docs/configuring/services/ephemeral-disk
+    """
+    # the logic is invoked only when specified in the tess-tpf specific env var,
+    # as the generic XDG_CACHE_HOME may be specified for other reasons.
+    if "true" != os.environ.get("TESS_TPF_CREATE_CACHE_DIRS", "").lower():
+        return None
+
+    cache_basedir = os.environ.get("XDG_CACHE_HOME", None)
+    if cache_basedir is None or cache_basedir == "":
+        return None
+
+    # lightkurve / astropy behaviors are that if the expected subdir exists,
+    # it will be used as the cache dir, otherwise the default dir will be used
+    # Hence we need to ensure the expected dirs have been created
+    os.makedirs(f"{cache_basedir}/lightkurve", exist_ok=True)  # for TPF FIT files
+    os.makedirs(f"{cache_basedir}/astropy", exist_ok=True)  # for astroquery
+
+    return cache_basedir
+
+
 def get_value_in_float(input: TextInput, default=None):
     val = input.value
     try:
@@ -1166,6 +1192,7 @@ def get_arg_as_float(args, arg_name, default_val=None):
 if __name__.startswith("bokeh_app_"):  # invoked from `bokeh serve`
     set_log_level_from_env()
     set_log_timed_from_env()
+    create_data_cache_dirs_from_env()
 
     # debug codes to ensure custom MAST timeout is applied
     from astroquery.mast import Observations
