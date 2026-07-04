@@ -39,9 +39,8 @@ ENV PYTHONUNBUFFERED True
 #       and set it to the public hostname of the deployed service.
 # See: https://docs.bokeh.org/en/latest/docs/reference/command/subcommands/serve.html#network-configuration
 #
-# MUST use vector form as distroless has no shell
-# OPEN: env vars not supported without shell. Limitations for now:
-# - hardcoded the port to 8080
-# - extra args via $BOKEH_EXTRA_ARGS not supported (e.g., to tweak bokeh logging)
-ENTRYPOINT ["/venv/bin/python3", "/venv/bin/bokeh", "serve", "--port", "8080", "tpf"]
-# non-vector form (use shell): CMD exec bokeh serve --port $PORT tpf $BOKEH_EXTRA_ARGS
+# MUST use vector form as distroless has no shell (and env vars cannot be specified as parameters)
+#
+# the custom bokeh_cli.py handles parameters from env vars $PORT and $BOKEH_EXTRA_ARGS
+ENTRYPOINT ["/venv/bin/python3", "tpf/bokeh_cli.py", "serve", "tpf"]
+# shell form: CMD exec bokeh serve --port $PORT tpf $BOKEH_EXTRA_ARGS
