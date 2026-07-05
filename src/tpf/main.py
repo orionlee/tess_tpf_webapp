@@ -832,6 +832,17 @@ def _screenshot_js_codes():
           jsEl.src = jsURL;
           document.head.appendChild(jsEl);
         }
+
+        const saveSVG = `
+<svg xmlns="http://www.w3.org/2000/svg" style="height: 1.2em;width: 1.2em;vertical-align: middle;" viewBox="0 -960 960 960" fill="#1f1f1f">
+    <path d="M480-336 288-528l51-51 105 105v-342h72v342l105-105 51 51-192 192ZM263.72-192Q234-192 213-213.15T192-264v-72h72v72h432v-72h72v72q0 29.7-21.16 50.85Q725.68-192 695.96-192H263.72Z"></path>
+</svg>`;
+
+        const copySVG = `
+<svg xmlns="http://www.w3.org/2000/svg" style="height: 1.2em;width: 1.2em;vertical-align: middle;" viewBox="0 -960 960 960" fill="#1f1f1f">
+    <path d="M360-240q-29.7 0-50.85-21.15Q288-282.3 288-312v-480q0-29.7 21.15-50.85Q330.3-864 360-864h384q29.7 0 50.85 21.15Q816-821.7 816-792v480q0 29.7-21.15 50.85Q773.7-240 744-240H360Zm0-72h384v-480H360v480ZM216-96q-29.7 0-50.85-21.15Q144-138.3 144-168v-552h72v552h456v72H216Zm144-216v-480 480Z"/>
+</svg>
+`;
         document.body.insertAdjacentHTML('beforeend', `
     <div id="screenshot-ui-ctr">
       <style>
@@ -853,7 +864,9 @@ def _screenshot_js_codes():
             <li><input type="radio" name="ss_opts" value="extLC">External Lightcurve</li>
         </ul>
 
-      <button id="screenshot-save-ctl">Save</button>&emsp;<button id="screenshot-copy-ctl">Copy</button>&emsp;<button id="screenshot-cancel-ctl">Cancel</button>
+      <button id="screenshot-save-ctl">${saveSVG}Save</button>&emsp;
+      <button id="screenshot-copy-ctl">${copySVG}Copy</button>&emsp;
+      <button id="screenshot-cancel-ctl">Cancel</button>
     </div>
     `);
 
