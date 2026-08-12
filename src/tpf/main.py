@@ -767,7 +767,7 @@ def _screenshot_js_codes():
       }
 
       function createScreenshotBlob(ctr) {
-        return domtoimage.toBlob(ctr);
+        return domtoimage.toBlob(ctr, {bgcolor: 'white'});
       }
 
       function saveScreenshot(ctr, filename) {
