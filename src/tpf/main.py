@@ -45,6 +45,34 @@ from .tpf_utils import (
     is_tesscut,
 )
 
+
+def is_notebook():
+    try:
+        shell = get_ipython().__class__.__name__
+        if shell == 'ZMQInteractiveShell':
+            return True   # Jupyter Notebook or JupyterLab
+        elif shell == 'TerminalInteractiveShell':
+            return False  # Terminal-based IPython
+        else:
+            return False  # Other shells
+    except NameError:
+        return False      # Standard Python interpreter or other env
+
+
+# for matplotlib, use non-interactive backend, to avoid
+# UserWarning: Starting a Matplotlib GUI outside of the main thread will likely fail
+# using the standard tk backend could cause fatal error during GC:
+#   ...
+#   Exception ignored while calling deallocator <function Image.__del__ at 0x000001AD2D1CFED0>:
+#   ...
+#   RuntimeError: main thread is not in main loop
+#   Tcl_AsyncDelete: async handler deleted by the wrong thread
+if not is_notebook():
+    import matplotlib
+    matplotlib.use("Agg")  # for png export; must be called before importing pyplot
+# else case in jupyter notebook, use the backend as-is, generally inline
+
+
 log = logging.getLogger(__name__)
 
 
