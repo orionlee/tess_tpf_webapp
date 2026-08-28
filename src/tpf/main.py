@@ -45,6 +45,34 @@ from .tpf_utils import (
     is_tesscut,
 )
 
+
+def is_notebook():
+    try:
+        shell = get_ipython().__class__.__name__
+        if shell == 'ZMQInteractiveShell':
+            return True   # Jupyter Notebook or JupyterLab
+        elif shell == 'TerminalInteractiveShell':
+            return False  # Terminal-based IPython
+        else:
+            return False  # Other shells
+    except NameError:
+        return False      # Standard Python interpreter or other env
+
+
+# for matplotlib, use non-interactive backend, to avoid
+# UserWarning: Starting a Matplotlib GUI outside of the main thread will likely fail
+# using the standard tk backend could cause fatal error during GC:
+#   ...
+#   Exception ignored while calling deallocator <function Image.__del__ at 0x000001AD2D1CFED0>:
+#   ...
+#   RuntimeError: main thread is not in main loop
+#   Tcl_AsyncDelete: async handler deleted by the wrong thread
+if not is_notebook():
+    import matplotlib
+    matplotlib.use("Agg")  # for png export; must be called before importing pyplot
+# else case in jupyter notebook, use the backend as-is, generally inline
+
+
 log = logging.getLogger(__name__)
 
 
@@ -744,6 +772,193 @@ Consider to shorten the range.
     return ui_layout
 
 
+def _screenshot_js_codes():
+    # the javascript codes that support taking screenshots (using dom-to-image-more library)
+    # At UI level, it adds a button at the bottom left of the screen.
+    return """
+    console.debug('JS codes for screenshots...');
+    (function() {
+      'use strict';
+      console.debug('custom js codes added');
+      function saveBlob(blob, filename) {
+        // Create a local URL pointing to the memory blob
+        const url = URL.createObjectURL(blob);
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.click();
+
+        // Free memory after the download triggers
+        URL.revokeObjectURL(url);
+        link.remove();
+      }
+
+      function createScreenshotBlob(ctr) {
+        return domtoimage.toBlob(ctr, {bgcolor: 'white'});
+      }
+
+      function saveScreenshot(ctr, filename) {
+        return createScreenshotBlob(ctr).then((blob) => {
+          saveBlob(blob, filename);
+        });
+      }
+
+      function copyScreenshotToClipboard(ctr) {
+        return createScreenshotBlob(ctr).then((blob) => {
+          navigator.clipboard.write([
+            new ClipboardItem({
+              [blob.type]: blob
+            })
+          ]).then(() => {
+            console.debug('blob copied to clipboard');
+          })
+        });
+      }
+
+      function getMainCtr() {
+        // the app's main container
+        // MUST NOT return the .shadowRoot. as domtoimage would not work then (complaining that the node is not attached)
+        return document.querySelector("body > div.bk-Row").shadowRoot.querySelector("div.bk-Column:nth-of-type(2)").shadowRoot.querySelector('div.bk-Column');
+      }
+
+      function getSkyViewCtr() {
+        return getMainCtr().shadowRoot.querySelector('div.bk-Column:nth-of-type(1)');
+      }
+
+      function getTPFInspectCtr() {
+        return getMainCtr().shadowRoot.querySelector('div.bk-Column:nth-of-type(3)');
+      }
+
+      function getExternalLCCtr() {
+        return getMainCtr().shadowRoot.querySelector('div.bk-Column:nth-of-type(4)');
+      }
+
+      //
+      // The UI elements
+      //
+
+      function showTakeScreenshotProgressUI() {
+        document.body.insertAdjacentHTML('beforeend', `
+    <div id="screenshot-ui-progres-ctr" style="position: fixed;top: 10vh;left: 20vw;padding: 16px 32px;z-index: 9999;background-color: rgba(255, 255, 225, 0.9);border: 1px solid black;border-radius: 12px;">
+    Taking Screenshot ...
+    </div>
+    `);
+      }
+
+      function removeTakeScreenshotProgressUI() {
+        document.getElementById('screenshot-ui-progres-ctr')?.remove();
+      }
+
+
+      function showSaveScreenShotPopIn() {
+        // https://github.com/1904labs/dom-to-image-more
+        if (document.getElementById('script#dtim-js') == null) {
+          const jsURL = 'https://cdn.jsdelivr.net/npm/dom-to-image-more@3.10.0/dist/dom-to-image-more.min.js';
+          const jsEl = document.createElement('script');
+          jsEl.id = 'dtim-js';
+          jsEl.src = jsURL;
+          document.head.appendChild(jsEl);
+        }
+
+        const saveSVG = `
+<svg xmlns="http://www.w3.org/2000/svg" style="height: 1.2em;width: 1.2em;vertical-align: middle;" viewBox="0 -960 960 960" fill="#1f1f1f">
+    <path d="M480-336 288-528l51-51 105 105v-342h72v342l105-105 51 51-192 192ZM263.72-192Q234-192 213-213.15T192-264v-72h72v72h432v-72h72v72q0 29.7-21.16 50.85Q725.68-192 695.96-192H263.72Z"></path>
+</svg>`;
+
+        const copySVG = `
+<svg xmlns="http://www.w3.org/2000/svg" style="height: 1.2em;width: 1.2em;vertical-align: middle;" viewBox="0 -960 960 960" fill="#1f1f1f">
+    <path d="M360-240q-29.7 0-50.85-21.15Q288-282.3 288-312v-480q0-29.7 21.15-50.85Q330.3-864 360-864h384q29.7 0 50.85 21.15Q816-821.7 816-792v480q0 29.7-21.15 50.85Q773.7-240 744-240H360Zm0-72h384v-480H360v480ZM216-96q-29.7 0-50.85-21.15Q144-138.3 144-168v-552h72v552h456v72H216Zm144-216v-480 480Z"/>
+</svg>
+`;
+        document.body.insertAdjacentHTML('beforeend', `
+    <div id="screenshot-ui-ctr">
+      <style>
+        #screenshot-ui-ctr {
+          position:fixed;top: 10vh;left: 20vw;z-index:9999;padding: 8px 32px 16px 32px;background-color: rgba(255, 255, 225, 0.9);border: 1px solid #333;border-radius: 12px;
+        }
+        #screenshot-ui-ctr  ul {
+          padding-left: 0; /* remove bullets indentation */
+        }
+        #screenshot-ui-ctr li {
+          list-style-type: none;
+        }
+    </style>
+    <h4>Screenshot</h4>
+        <ul>
+            <li><input type="radio" name="ss_opts" value="all" checked>All</li>
+            <li><input type="radio" name="ss_opts" value="skyview">Skyview</li>
+            <li><input type="radio" name="ss_opts" value="tpf">Pixels Inspection</li>
+            <li><input type="radio" name="ss_opts" value="extLC">External Lightcurve</li>
+        </ul>
+
+      <button id="screenshot-save-ctl">${saveSVG}Save</button>&emsp;
+      <button id="screenshot-copy-ctl">${copySVG}Copy</button>&emsp;
+      <button id="screenshot-cancel-ctl">Cancel</button>
+    </div>
+    `);
+
+        function getContainerToTakeScreenshot(ctrStr) {
+          if (ctrStr == 'all') {
+            return getMainCtr();
+          }
+          if (ctrStr == 'skyview') {
+            return getSkyViewCtr();
+          }
+          if (ctrStr == 'tpf') {
+            return getTPFInspectCtr();
+          }
+          if (ctrStr == 'extLC') {
+            return getExternalLCCtr();
+          }
+          return null; // should never happen
+        }
+
+        document.getElementById('screenshot-save-ctl').onclick = (evt) => {
+          const popInCtr = document.getElementById('screenshot-ui-ctr');
+          const ctrStr = popInCtr.querySelector('input[name="ss_opts"]:checked').value;
+          const ctr = getContainerToTakeScreenshot(ctrStr);
+          console.debug('ctr:', ctr);
+
+          const [,tic] = location.search.match(/[?&]tic=([^&]+)/) || [''];
+          const [,sector] = location.search.match(/[?&]sector=([^&]*)/) || [''];
+          const filename = `ttpi_screenshot_tic${tic}_s${sector}_${ctrStr}.png`;
+
+          document.getElementById('screenshot-ui-ctr').remove();
+          showTakeScreenshotProgressUI();
+          saveScreenshot(ctr, filename).then(removeTakeScreenshotProgressUI);
+        };
+
+        document.getElementById('screenshot-copy-ctl').onclick = (evt) => {
+          const popInCtr = document.getElementById('screenshot-ui-ctr');
+          const ctrStr = popInCtr.querySelector('input[name="ss_opts"]:checked').value;
+          const ctr = getContainerToTakeScreenshot(ctrStr);
+          console.debug('ctr:', ctr);
+
+          document.getElementById('screenshot-ui-ctr').remove();
+          showTakeScreenshotProgressUI();
+          copyScreenshotToClipboard(ctr).then(removeTakeScreenshotProgressUI);
+        };
+
+        document.getElementById('screenshot-cancel-ctl').onclick = (evt) => {
+          document.getElementById('screenshot-ui-ctr').remove();
+        };
+      }
+
+      function initSaveScreenShotUI() {
+        document.body.insertAdjacentHTML('beforeend', `
+     <div style="position: fixed; left: 16px; bottom: 36px; z-index:999;">
+       <button id="screenshot-ctl">Screenshot...</button>
+     </div>
+    `);
+        document.getElementById('screenshot-ctl').onclick = showSaveScreenShotPopIn;
+      }
+      initSaveScreenShotUI();
+
+    })();
+"""
+
+
 def create_search_form(tic, sector, magnitude_limit):
     def to_str(val):
         if val is None:
@@ -810,9 +1025,10 @@ def create_search_form(tic, sector, magnitude_limit):
 """
 
     # include external links if a TIC is specified
-    include_ext_links = tic is not None and len(str(tic).strip()) > 0
+    is_tic_specified = tic is not None and len(str(tic).strip()) > 0
+
     ext_links_html = ""
-    if include_ext_links:
+    if is_tic_specified:
         ext_links_html = f"""
 <div id="ext-links-ctr">
     <p>See also:
@@ -854,7 +1070,7 @@ def create_search_form(tic, sector, magnitude_limit):
 {search_form_html}
 {ext_links_html}
 {footer_html}
-"""
+""",
         ),
         name="app_search",
     )
@@ -1110,6 +1326,14 @@ def show_app(tic, sector, magnitude_limit=None):
             # the UI for monitoring WebSocket connection is only relevant
             # in the normal case that interactive widgets are to be shown.
             add_connection_lost_ui(doc)
+
+        is_tic_specified = tic is not None and len(str(tic).strip()) > 0
+        if is_tic_specified:
+            # Case rendering the output for a TIC, add js codes that support screenshots.
+            # The DocumentReady only works at the top level doc (effectively curdoc).
+            from bokeh.events import DocumentReady
+
+            doc.js_on_event(DocumentReady, CustomJS(code=_screenshot_js_codes()))
 
     #
     # the actual entry point
