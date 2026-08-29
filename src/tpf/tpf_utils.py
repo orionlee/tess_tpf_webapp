@@ -13,18 +13,10 @@ from .lk_patch.timed import timed
 
 log = logging.getLogger(__name__)
 
-if os.environ.get("MAST_ENABLE_CLOUD_DATASET", True):
-    # Prefer AWS to download MAST products (LCs, TPFs, etc.). Search is still on MAST
-    # (requires boto3)
-    from astroquery.mast import Observations
-
-    Observations.enable_cloud_dataset()
-
 LK_SEARCH_NUM_RETRIES = os.environ.get("LK_SEARCH_NUM_RETRIES", 4)
 
+
 # use tpf_utils.log instance so that retry warning would show up in gcloud log
-
-
 @retry(
     IOError,
     tries=LK_SEARCH_NUM_RETRIES,
@@ -274,6 +266,15 @@ async def _do_get_tpf(
 
     # case no TPF nor TessCut
     return None, None
+
+
+def get_exptime(tpf):
+    """Deduce per-cadence exposure time from the header of the given TPF ."""
+    return (
+        tpf.hdu[1].header.get("FRAMETIM", np.nan)
+        * tpf.hdu[1].header.get("NUM_FRM", np.nan)
+        * u.second
+    )
 
 
 def is_tesscut(tpf):
