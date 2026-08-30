@@ -533,7 +533,14 @@ def _row_to_dict(source, idx):
 
 
 def add_catalog_figure_elements(
-    provider, result, tpf, fig, ui_ctr, message_selected_target, arrow_4_selected
+    provider,
+    result,
+    tpf,
+    fig,
+    ui_ctr,
+    message_selected_target,
+    arrow_4_selected,
+    selected_callback,
 ):
     def check_catalog_checkbox_if_present():
         # note: need to dynamically locate the widget, because it is conditionally
@@ -650,10 +657,11 @@ def add_catalog_figure_elements(
 Selected:<br>
 <table class="target_details">
 """
+            data_list = []  # for callback
             for idx in new:
-                details, extra_rows = provider.get_detail_view(
-                    _row_to_dict(source, idx)
-                )
+                data = _row_to_dict(source, idx)
+                data_list.append(data)
+                details, extra_rows = provider.get_detail_view(data)
                 for header, val_html in details.items():
                     msg += f"<tr><td>{header}</td><td>{val_html}</td>"
                 if extra_rows is not None:
@@ -662,6 +670,8 @@ Selected:<br>
                 msg += '<tr><td colspan="2">&nbsp;</td></tr>'  # space between multiple targets
             msg += "\n<table>"
             message_selected_target.text = msg
+            if selected_callback is not None:
+                selected_callback(data_list, provider)
         else:  # case no selection
             message_selected_target.text = ""
 
@@ -743,6 +753,7 @@ async def async_parse_and_add_catalogs_figure_elements(
     ui_ctr,
     message_selected_target,
     arrow_4_selected,
+    selected_callback,
 ):
     tpf_label = f"TIC {tpf.meta.get('TICID')}, sector {tpf.meta.get('SECTOR')}"
 
@@ -799,6 +810,7 @@ async def async_parse_and_add_catalogs_figure_elements(
                     ui_ctr,
                     message_selected_target,
                     arrow_4_selected,
+                    selected_callback=selected_callback,
                 )
             except Exception as err:
                 renderer = fig_tpf.scatter()  # a dummy renderer
@@ -1573,6 +1585,7 @@ def show_skyview_widget(
     catalogs=None,
     magnitude_limit=18,
     return_type=None,
+    selected_callback=None,
 ):
     """skyview
 
@@ -1662,6 +1675,7 @@ def show_skyview_widget(
             ui_ctr,
             message_selected_target,
             arrow_4_selected,
+            selected_callback=selected_callback,
         )
 
         in_star_search, btn_star_search = _create_search_star_ui(providers, fig_tpf)

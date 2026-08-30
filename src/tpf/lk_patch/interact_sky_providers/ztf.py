@@ -19,8 +19,6 @@ def _to_lc_url(oid, data_release, format):
     else:
         return [_to_lc_url(a_oid, data_release, format) for a_oid in oid]
 
-        # OPEN: consider memoize the result, as astroquery v0.47 does not support caching for Irsa
-
 
 @lru_cache
 def _query_cone_region(ra_deg, dec_deg, radius_arcsec, catalog) -> Table:
@@ -186,9 +184,7 @@ class ZTFInteractSkyCatalogProvider(InteractSkyCatalogProvider):
         ]
 
     def get_detail_view(self, data: dict) -> Tuple[dict, list]:
-        ztf_url = _to_lc_url(
-            data["oid"], self.data_release, self.lc_format
-        )  # the csv data
+        ztf_url = self.to_lc_url(data)
         snad_url = f"https://ztf.snad.space/view/{data['oid']}"  # a web viewer
         coordStrEncoded = urllib.parse.quote_plus(f"{data['ra']} {data['dec']}")
         zubercal_url = (
@@ -224,3 +220,7 @@ class ZTFInteractSkyCatalogProvider(InteractSkyCatalogProvider):
 
         term_to_use = get_ztf_id(term)
         return self._search_col_as_str(source, "oid", term_to_use)
+
+    def to_lc_url(self, data: dict) -> str:
+        """Helper to construct the Lightcurve URL to ZTF archive of a given entry."""
+        return _to_lc_url(data["oid"], self.data_release, self.lc_format)

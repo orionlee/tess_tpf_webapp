@@ -242,9 +242,7 @@ class SkyPatrol2InteractSkyCatalogProvider(InteractSkyCatalogProvider):
         ]
 
     def get_detail_view(self, data: dict) -> Tuple[dict, list]:
-        skypatrol2_site_url = (
-            f"http://asas-sn.ifa.hawaii.edu/skypatrol/objects/{data['asas_sn_id']}"
-        )
+        skypatrol2_site_url = self.to_page_url(data)
         return {
             "ASAS-SN ID": f"""{data["asas_sn_id"]} (<a href="{skypatrol2_site_url}" target="_blank">SkyPatrol v2</a>)""",
             'Separation (")': f"{data['separation']:.2f}",
@@ -266,3 +264,7 @@ class SkyPatrol2InteractSkyCatalogProvider(InteractSkyCatalogProvider):
         term_to_use = get_skypatrol2_id(term)
 
         return self._search_col_as_str(source, "asas_sn_id", term_to_use)
+
+    def to_page_url(self, data: dict) -> str:
+        """Helper to return the URL of the SkyPatrol v2 page of the given target."""
+        return f"http://asas-sn.ifa.hawaii.edu/skypatrol/objects/{data['asas_sn_id']}"

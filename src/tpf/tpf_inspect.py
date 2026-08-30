@@ -576,6 +576,7 @@ def create_lc_viewer_ui():
         placeholder=(
             "ZTF Lightcurve CSV URL (the LC link to the right of ZTF OID), or ASAS-SN SkyPatrol v2 URL (the SkyPatrol v2 link)"
         ),
+        name="lc_viewer_ctl_inp_url",
         # value="https://irsa.ipac.caltech.edu/cgi-bin/ZTF/nph_light_curves?ID=660106400019009&COLLECTION=ztf_dr21&FORMAT=csv",  # noqa: E501  # TST
     )
 
@@ -749,36 +750,62 @@ async def create_app_body_ui_from_tpf(doc, tpf, magnitude_limit=None, catalogs=N
             category=lk.LightkurveWarning,
         )
 
+        ui_layout = column(  # the UI to be returned
+            # the name is used to signify an interactive UI is returned
+            # (as opposed to the UI with a dummy UI or error message in the boundary conditions)
+            name="app_body_interactive",
+        )
+
+        def add_url_to_lc_viewer_on_star_selected(data_list, provider):
+            in_lc_viewer_url = ui_layout.select_one({"name": "lc_viewer_ctl_inp_url"})
+            if in_lc_viewer_url is None:
+                log.warning(
+                    "add_url_to_lc_viewer_on_star_selected(): LC Viewer URL Text Input unexpectedly not found. " "No op."
+                )
+                return
+            if len(data_list) < 1:  # nothing selected
+                return
+
+            from .lk_patch.interact_sky_providers.ztf import ZTFInteractSkyCatalogProvider
+            from .lk_patch.interact_sky_providers.skypatrol2 import SkyPatrol2InteractSkyCatalogProvider
+
+            url_field_value = None
+            if isinstance(provider, ZTFInteractSkyCatalogProvider):
+                url_field_value = provider.to_lc_url(data_list[0])
+            elif isinstance(provider, SkyPatrol2InteractSkyCatalogProvider):
+                url_field_value = provider.to_page_url(data_list[0])
+            # LC Viewer does not support the provider.
+            if url_field_value is not None:
+                in_lc_viewer_url.value = url_field_value
+
         create_skyview_ui = show_skyview_widget(
             tpf_skyview,
             aperture_mask=tpf.pipeline_mask,
             magnitude_limit=magnitude_limit,
             catalogs=catalogs_with_params,
             return_type="doc_init_fn",
+            selected_callback=add_url_to_lc_viewer_on_star_selected,
         )
 
         skyview_ui, catalog_plot_fns = await create_skyview_ui(doc)
-        # return the UI, and the catalog_plot_fns (for progressive plot of the catalog data asynchronously)
-        return (
-            column(
-                skyview_ui,
-                create_skyview_metadata_ui(
-                    tpf,
-                    ztf_search_radius=ztf_search_radius,
-                    ztf_ngoodobsrel_min=ztf_ngoodobsrel_min,
-                    skypatrol2_search_radius=skypatrol2_search_radius,
-                ),
-                create_tpf_interact_ui(
-                    tpf,
-                    fig_tpf_skyview=skyview_ui.select_one({"name": "fig_tpf_skyview"}),
-                ),
-                create_lc_viewer_ui(),
-                # the name is used to signify an interactive UI is returned
-                # (as opposed to the UI with a dummy UI or error message in the boundary conditions)
-                name="app_body_interactive",
+
+        ui_layout.children = [
+            skyview_ui,
+            create_skyview_metadata_ui(
+                tpf,
+                ztf_search_radius=ztf_search_radius,
+                ztf_ngoodobsrel_min=ztf_ngoodobsrel_min,
+                skypatrol2_search_radius=skypatrol2_search_radius,
             ),
-            catalog_plot_fns,
-        )
+            create_tpf_interact_ui(
+                tpf,
+                fig_tpf_skyview=skyview_ui.select_one({"name": "fig_tpf_skyview"}),
+            ),
+            create_lc_viewer_ui(),
+        ]
+
+        # return the UI, and the catalog_plot_fns (for progressive plot of the catalog data asynchronously)
+        return (ui_layout, catalog_plot_fns)
 
 
 # BEGIN Jupyter notebook helpers, not used by the web app
