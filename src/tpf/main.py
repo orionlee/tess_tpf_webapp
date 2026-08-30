@@ -2,6 +2,7 @@ import logging
 import os
 from functools import cache
 
+from bokeh.document import without_document_lock
 from bokeh.events import DocumentReady
 from bokeh.layouts import column, row
 from bokeh.models import (
@@ -9,7 +10,6 @@ from bokeh.models import (
     Div,
 )
 from bokeh.plotting import curdoc
-from tornado.ioloop import IOLoop
 
 from .bokeh_utils import suppress_bokeh_default_reconnect_and_ui
 from .tpf_inspect import create_app_body_ui_from_tpf, progressive_plot_catalogs
@@ -532,7 +532,7 @@ async def search_and_download_tpf_with_ui(tic, sector):
 def show_app(tic, sector, magnitude_limit=None):
 
     #
-    # First create the skeleton UI
+    # 1. First create the skeleton UI
     #
     doc = curdoc()
 
@@ -586,39 +586,46 @@ def show_app(tic, sector, magnitude_limit=None):
     else:
         in_progress_msg = f"Search and download TPF for TIC {tic}, sector {sector} ..."
     in_progress_msg = create_in_progress_msg_html(in_progress_msg)
-    ui_main.children = [Div(text=in_progress_msg)]
+    ui_main.children = [Div(text=in_progress_msg)]  # to be replaced with actual UI
 
-    # The function for TPF download / rendering,
-    # to be run in a background, allowing the above skeleton UI be rendered to the user ASAP
+    #
+    # 2. Then, fill  the skeleton UI with the actual UI for the tpf
+    #
+    # The functions for TPF download / rendering (2 parts)
+    # 2a. actually rendering, to be run in main,  with bokeh doc locked
+    async def do_render_app_body_in_main(tpf, err_msg):
+        # to be run in the main thread that updates the bokeh doc
+        if err_msg is not None:
+            ui_main.children = [Div(text=err_msg)]
+            return
+
+        ui_body, catalog_plot_fns = await create_app_body_ui_from_tpf(
+            doc,
+            tpf,
+            magnitude_limit=None,
+            catalogs=get_default_catalogs_from_env(),
+        )
+        ui_main.children = [ui_body]  # replace the skeleton UI
+        progressive_plot_catalogs(doc, catalog_plot_fns)
+
+    # 2b. TPF download to be run in a background, without boekh doc locked;
+    #     allowing the above skeleton UI be rendered to the user ASAP
+    @without_document_lock
     async def do_create_app_body_ui_in_background():
         # do the search and download TPF in a background thread
         tpf, err_msg = await search_and_download_tpf_with_ui(tic, sector)
 
-        async def render_app_body_in_main():
-            # to be run in the main thread that updates the bokeh doc
-            if err_msg is not None:
-                ui_main.children = [Div(text=err_msg)]
-                return
-
-            ui_body, catalog_plot_fns = await create_app_body_ui_from_tpf(
-                doc,
-                tpf,
-                magnitude_limit=None,
-                catalogs=get_default_catalogs_from_env(),
-            )
-            ui_main.children = [ui_body]  # replace the skeleton UI
-            progressive_plot_catalogs(doc, catalog_plot_fns)
-
         # CRITICAL STEP: Use add_next_tick_callback on the saved 'doc' reference.
         # This pushes data back to the main thread securely without locking the engine.
-        doc.add_next_tick_callback(render_app_body_in_main)
+        doc.add_next_tick_callback(lambda: do_render_app_body_in_main(tpf, err_msg))
 
-    # Fill in the skeleton UI in the background
-    #
-    # SPAWN THE ASYNC TASK ON TORNADO'S LOOP
-    # spawn_callback schedules the async task to execute concurrently.
-    # The initialization script exits instantly, pushing the skeleton UI to the client.
-    IOLoop.current().spawn_callback(do_create_app_body_ui_in_background)
+    # Fill in the skeleton UI in the background, allowing the
+    # initialization logic exits instantly, pushing the skeleton UI to the client.
+    # - do the TPF search/download in the background with add_timeout_callback()
+    # - update the bokeh doc (the UI) synchronously, with the doc object locked.
+    # - the pattern is the same as async plotting of catalog stars on TPF pixels in
+    #   lk_patch.interact.async_parse_and_add_catalogs_figure_elements()
+    doc.add_timeout_callback(do_create_app_body_ui_in_background, 0)
 
 
 #
