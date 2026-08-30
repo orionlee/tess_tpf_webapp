@@ -55,7 +55,7 @@ def fast_search_tesscut(target, sector):
         if not isinstance(sector, int):
             raise ValueError("fast_search_tesscut(): parameter sector must be int.")
         if sector < 1:
-            raise ValueError("fast_search_tesscut(): invalid sector: {sector}.")
+            raise ValueError(f"fast_search_tesscut(): invalid sector: {sector}.")
         if sector < 27:
             return 1426  # 30-min cadence in cycles 1 - 2
         if sector < 56:
