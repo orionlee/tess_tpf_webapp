@@ -2,12 +2,14 @@ import logging
 import os
 from functools import cache
 
+from bokeh.events import DocumentReady
 from bokeh.layouts import column, row
 from bokeh.models import (
     CustomJS,
     Div,
 )
 from bokeh.plotting import curdoc
+from tornado.ioloop import IOLoop
 
 from .bokeh_utils import suppress_bokeh_default_reconnect_and_ui
 from .tpf_inspect import create_app_body_ui_from_tpf, progressive_plot_catalogs
@@ -170,7 +172,7 @@ def _screenshot_js_codes():
       function getMainCtr() {
         // the app's main container
         // MUST NOT return the .shadowRoot. as domtoimage would not work then (complaining that the node is not attached)
-        return document.querySelector("body > div.bk-Row").shadowRoot.querySelector("div.bk-Column:nth-of-type(2)").shadowRoot.querySelector('div.bk-Column');
+        return document.querySelector("body > div > div.bk-Row").shadowRoot.querySelector("div.bk-Column:nth-of-type(2)").shadowRoot.querySelector('div.bk-Column');
       }
 
       function getSkyViewCtr() {
@@ -437,58 +439,6 @@ def create_app_ui_container():
     return ui_layout
 
 
-async def create_app_body_ui(doc, tic, sector, magnitude_limit=None):
-    # if True:  # for dev purpose only
-    #     return column(create_lc_viewer_ui())
-
-    # convert (potential) textual inputs to typed value
-    try:
-        tic = None if tic is None or tic == "" else int(tic)
-        sector = None if sector is None or sector == "" else int(sector)
-        magnitude_limit = (
-            None
-            if magnitude_limit is None or magnitude_limit == ""
-            else float(magnitude_limit)
-        )
-    except Exception as err:
-        return Div(
-            text=f"<h3>Skyview</h3> Invalid Parameter. Error: {err}", name="skyview"
-        ), None
-
-    if tic is None:
-        return (
-            column(
-                Div(text="<h3>Skyview</h3>", name="skyview"),
-                Div(text="<h3>Pixels Inspection</h3>", name="tpf_interact_ctr"),
-                Div(text="<h3>Lightcurve</h3>", name="lc_viewer"),
-            ),
-            None,
-        )
-
-    if sector is not None:
-        msg_label = f"TIC {tic} sector {sector}"
-    else:
-        msg_label = f"TIC {tic}"
-
-    # log the beginning of search/download TPF to clearly see if it takes a long time
-    log.debug(f"Search and download TPF for TIC {tic}, sector {sector}.")
-    # mark_tpf_accessed=True to facilitate LRU-like file cache cleaning done in app_hooks.py
-    tpf, sr = await get_tpf(tic, sector, msg_label, mark_tpf_accessed=True)
-
-    if tpf is None:
-        log.debug(f"Cannot find TPF or TESSCut for {msg_label}. No plot to be made.")
-        return Div(
-            text=f"<h3>SkyView</h3> Cannot find Pixel data for {msg_label}",
-            name="skyview",
-        ), None
-
-    catalogs = get_default_catalogs_from_env()
-
-    return await create_app_body_ui_from_tpf(
-        doc, tpf, magnitude_limit=magnitude_limit, catalogs=catalogs
-    )
-
-
 def get_default_catalogs_from_env():
     catalogs_str = os.environ.get("TESS_TPF_WEBAPP_CATALOGS", "")
     if catalogs_str.strip() == "":
@@ -515,62 +465,160 @@ Lost the connection to the server. You'd need to reload the page for some intera
     doc.js_on_event("connection_lost", js_connection_lost)
 
 
+def create_in_progress_msg_html(message):
+    in_progress_style = """
+<style>
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+.in-progress-box {
+    padding: 16px;
+    background: linear-gradient(90deg, #fbfbfb 25%, #ececec 50%, #fbfbfb 75%);
+    background-size: 200% 100%;
+    animation: shimmer 5s infinite linear;
+    border-radius: 6px; border: 1px solid #e1e1e1;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: bold;
+}
+</style>
+"""
+    return f"""
+{in_progress_style}
+<div class="in-progress-box">{message}</div>
+"""
+
+
+async def search_and_download_tpf_with_ui(tic, sector):
+    # returning a (TPF, err_msg) tuple
+
+    if sector is not None:
+        msg_label = f"TIC {tic} sector {sector}"
+    else:
+        msg_label = f"TIC {tic}"
+
+    # log the beginning of search/download TPF to clearly see if it takes a long time
+    log.debug(f"Search and download TPF for {msg_label}.")
+
+    try:
+        # mark_tpf_accessed=True to facilitate LRU-like file cache cleaning done in app_hooks.py
+        tpf, _ = await get_tpf(tic, sector, msg_label, mark_tpf_accessed=True)
+
+        if tpf is None:
+            err_msg = f"Cannot find Pixel data for {msg_label}"
+            return None, err_msg
+    except Exception as e:
+        if isinstance(e, IOError):
+            # usually some issues in network or MAST server, nothing can be done on our end
+            warn_msg = (
+                f"IOError (likely intermittent) of type {type(e).__name__} in "
+                f"creating Inspector for TIC {tic}, sector {sector}"
+            )
+            log.warning(warn_msg)
+            err_msg = (
+                f"Network or MAST Server Error in creating Inspector. {type(e).__name__}: {e}.<br>"
+                "Reload the page after a while to see if the issue is resolved."
+            )
+        else:
+            # unexpected errors that might mean bugs on our end.
+            log.error(
+                f"Error of type {type(e).__name__} in creating Inspector for TIC {tic}, sector {sector}",
+                exc_info=True,
+            )
+            err_msg = f"Error in creating Inspector. {type(e).__name__}: {e}"
+        return None, err_msg
+
+    # case tpf has been downloaded successfully
+    return tpf, None
+
+
 def show_app(tic, sector, magnitude_limit=None):
 
-    async def create_app_ui(doc):
-        ui_ctr = create_app_ui_container()
-        ui_left = ui_ctr.select_one({"name": "app_left"})
-        ui_left.children = [create_search_form(tic, sector, magnitude_limit)]
-
-        ui_main = ui_ctr.select_one({"name": "app_main"})
-        try:
-            ui_body, catalog_plot_fns = await create_app_body_ui(
-                doc, tic, sector, magnitude_limit=magnitude_limit
-            )
-        except Exception as e:
-            if isinstance(e, IOError):
-                # usually some issues in network or MAST server, nothing can be done on our end
-                warn_msg = (
-                    f"IOError (likely intermittent) of type {type(e).__name__} in "
-                    f"creating Inspector for TIC {tic}, sector {sector}"
-                )
-                log.warning(warn_msg)
-                err_msg = (
-                    f"Network or MAST Server Error in creating Inspector. {type(e).__name__}: {e}.<br>"
-                    "Reload the page after a while to see if the issue is resolved."
-                )
-            else:
-                # unexpected errors that might mean bugs on our end.
-                log.error(
-                    f"Error of type {type(e).__name__} in creating Inspector for TIC {tic}, sector {sector}",
-                    exc_info=True,
-                )
-                err_msg = f"Error in creating Inspector. {type(e).__name__}: {e}"
-            ui_body = Div(text=err_msg)
-            catalog_plot_fns = None
-
-        ui_main.children = [ui_body]
-        doc.add_root(ui_ctr)
-        progressive_plot_catalogs(doc, catalog_plot_fns)
-        if ui_body.name == "app_body_interactive":
-            # the UI for monitoring WebSocket connection is only relevant
-            # in the normal case that interactive widgets are to be shown.
-            add_connection_lost_ui(doc)
-
-        is_tic_specified = tic is not None and len(str(tic).strip()) > 0
-        if is_tic_specified:
-            # Case rendering the output for a TIC, add js codes that support screenshots.
-            # The DocumentReady only works at the top level doc (effectively curdoc).
-            from bokeh.events import DocumentReady
-
-            doc.js_on_event(DocumentReady, CustomJS(code=_screenshot_js_codes()))
-
     #
-    # the actual entry point
+    # First create the skeleton UI
     #
     doc = curdoc()
-    doc.add_next_tick_callback(lambda: create_app_ui(doc))
+
+    ui_ctr = create_app_ui_container()
+    ui_left = ui_ctr.select_one({"name": "app_left"})
+    ui_left.children = [create_search_form(tic, sector, magnitude_limit)]
+    ui_main = ui_ctr.select_one({"name": "app_main"})
+    doc.add_root(ui_ctr)
+
     suppress_bokeh_default_reconnect_and_ui(doc)
+
+    # convert (potential) textual inputs to typed value
+    try:
+        tic = None if tic is None or tic == "" else int(tic)
+        sector = None if sector is None or sector == "" else int(sector)
+        magnitude_limit = (
+            None
+            if magnitude_limit is None or magnitude_limit == ""
+            else float(magnitude_limit)
+        )
+    except Exception as err:
+        ui_main.children = [Div(text=f"Invalid Parameter. Error: {err}")]
+        return
+
+    # case no TIC, just the search form
+    if tic is None:
+        ui_main.children = [
+            column(
+                Div(
+                    text="""
+<h3>TESS Target Pixels Inspector</h3>
+<p>Inspect TESS satellite pixels data for a given target by TIC, e.g., 86263325, 400621146.</p>
+"""
+                )
+            )
+        ]
+        return
+
+    # case a non-empty TIC, search and download the TPF
+
+    #  Screenshot Javascript logic
+    #    the js codes are evaluated only at DocumentReady event.
+    #    I can't make it work at other events.
+    doc.js_on_event(DocumentReady, CustomJS(code=_screenshot_js_codes()))
+
+    # the UI for monitoring WebSocket connection is only relevant when there is a TIC
+    add_connection_lost_ui(doc)
+
+    if sector is None:
+        in_progress_msg = f"Search and download TPF for TIC {tic} ..."
+    else:
+        in_progress_msg = f"Search and download TPF for TIC {tic}, sector {sector} ..."
+    in_progress_msg = create_in_progress_msg_html(in_progress_msg)
+    ui_main.children = [Div(text=in_progress_msg)]
+
+    # The function for TPF download / rendering,
+    # to be run in a background, allowing the above skeleton UI be rendered to the user ASAP
+    async def do_create_app_body_ui_in_background():
+        # do the search and download TPF in a background thread
+        tpf, err_msg = await search_and_download_tpf_with_ui(tic, sector)
+
+        async def render_app_body_in_main():
+            # to be run in the main thread that updates the bokeh doc
+            if err_msg is not None:
+                ui_main.children = [Div(text=err_msg)]
+                return
+
+            ui_body, catalog_plot_fns = await create_app_body_ui_from_tpf(
+                doc,
+                tpf,
+                magnitude_limit=None,
+                catalogs=get_default_catalogs_from_env(),
+            )
+            ui_main.children = [ui_body]  # replace the skeleton UI
+            progressive_plot_catalogs(doc, catalog_plot_fns)
+
+        # CRITICAL STEP: Use add_next_tick_callback on the saved 'doc' reference.
+        # This pushes data back to the main thread securely without locking the engine.
+        doc.add_next_tick_callback(render_app_body_in_main)
+
+    # Fill in the skeleton UI in the background
+    #
+    # SPAWN THE ASYNC TASK ON TORNADO'S LOOP
+    # spawn_callback schedules the async task to execute concurrently.
+    # The initialization script exits instantly, pushing the skeleton UI to the client.
+    IOLoop.current().spawn_callback(do_create_app_body_ui_in_background)
 
 
 #
