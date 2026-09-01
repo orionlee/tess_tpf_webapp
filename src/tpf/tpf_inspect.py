@@ -35,6 +35,7 @@ from bokeh.plotting import (
 from .bokeh_utils import (
     get_value_in_float,
     replace_or_append_by_name,
+    create_collapsible_section,
     suppress_bokeh_default_reconnect_and_ui,
 )
 from .ext_gaia_tic import ExtendedGaiaDR3TICInteractSkyCatalogProvider
@@ -113,9 +114,7 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
 &emsp;<a href="https://transit-vetting.streamlit.app/?tic={tpf.meta.get("TICID")}&sec={tpf.meta.get("SECTOR")}"
    style="font-size: 120%;" title="Webapp to identify centroids" target="_blank">centroid analysis</a>
 """
-    ui_layout = column(
-        Div(text="<hr>"),  # a spacer
-        Div(text="<h3>Pixels Inspection</h3>"),
+    ui_layout = column(  # the UI for the TPF interact
         row(
             btn_inspect,
             btn_help_inspect,
@@ -129,7 +128,6 @@ Shift-Click to add to the selections. Ctrl-Shift-Click to remove from the select
             in_ymax,
             Div(text=centroid_link_html),
         ),
-        name="tpf_interact_ctr",
     )
 
     # add interactivity
@@ -365,7 +363,14 @@ Consider to shorten the range.
 
     btn_inspect.on_click(add_tpf_interact_fig_with_msg)
 
-    return ui_layout
+    return column(  # wrap the UI with header, etc.
+        Div(text="<hr>"),  # a spacer
+        create_collapsible_section(
+            "Pixels Inspection",
+            ui_layout,
+        ),
+        name="tpf_interact_ctr",
+    )
 
 
 def show_tpf_orientation_html(tpf):
@@ -599,11 +604,7 @@ def create_lc_viewer_ui():
     )
     btn_plot = Button(label="Plot", button_type="primary")
 
-    ui_layout = column(
-        Div(text="<hr>"),  # a spacer
-        Div(
-            text="<h3>Lightcurve<span style='font-weight: normal; font-size: 90%;'> from ZTF or SkyPatrol v2</span></h3>"
-        ),
+    ui_layout = column(  # the viewer UI
         row(Div(text="URL *"), in_url),
         row(
             Div(text="Period (d)"),
@@ -615,7 +616,6 @@ def create_lc_viewer_ui():
             btn_period_double,
         ),
         row(btn_plot, in_use_cmap_for_folded),
-        name="lc_viewer_ctl_ctr",
     )
 
     # add interactivity
@@ -660,7 +660,15 @@ def create_lc_viewer_ui():
     btn_period_half.on_click(lambda: do_change_period(0.5))
     btn_period_double.on_click(lambda: do_change_period(2))
 
-    return ui_layout
+    return column(  # wrap the UI with header, etc.
+        Div(text="<hr>"),  # a spacer
+        create_collapsible_section(
+            "Lightcurve<span style='font-weight: normal; font-size: 90%;'> from ZTF or SkyPatrol v2</span>",
+            ui_layout,
+        ),
+        name="lc_viewer_ctl_ctr",
+    )
+
 
 
 def progressive_plot_catalogs(doc, catalog_plot_fns):
