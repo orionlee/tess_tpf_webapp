@@ -380,16 +380,31 @@ def make_lightcurve_figure_elements(lc, lc_source, ylim_func=None, plot_scatter_
     fig.y_range = Range1d(start=ylims[0], end=ylims[1])
 
     # Add step lines, circles, and hover-over tooltips
-    r_step = fig.step(
-        "time",
-        "flux",
-        line_width=1,
-        color="gray",
-        source=lc_source,
-        nonselection_line_color="gray",
-        nonselection_line_alpha=1.0,
-    )
+    if plot_scatter_only:
+        # case show circle instead of step lines
+        r_step = fig.scatter(
+            "time",
+            "flux",
+            source=lc_source,
+            marker="circle",
+            size=4,
+            line_color="gray",
+            fill_color="gray",
+        )
+    else:
+        r_step = fig.step(
+            "time",
+            "flux",
+            line_width=1,
+            color="gray",
+            source=lc_source,
+            nonselection_line_color="gray",
+            nonselection_line_alpha=1.0,
+        )
     r_step.name = "lc_step"  # let callers access it by name
+
+    # the r_circle glyph is not visible (alpha=0),
+    # it is there to make selection easier (with a relatively large size)
     r_circle = fig.scatter(
         "time",
         "flux",
@@ -443,16 +458,6 @@ def make_lightcurve_figure_elements(lc, lc_source, ylim_func=None, plot_scatter_
         line_alpha=0.5,
     )
     fig.add_layout(vertical_line)
-
-    if plot_scatter_only:
-        # make the plot scatter like instead of lines
-        r_step.visible = False
-
-        r_circle.glyph.fill_color = "gray"
-        r_circle.glyph.fill_alpha = 1.0
-        r_circle.nonselection_glyph.fill_color = "gray"
-        r_circle.nonselection_glyph.fill_alpha = 1.0
-        r_circle.glyph.size = 4
 
     return fig, vertical_line
 
