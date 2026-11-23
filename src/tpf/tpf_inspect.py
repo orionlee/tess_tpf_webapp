@@ -682,8 +682,11 @@ def progressive_plot_catalogs(doc, catalog_plot_fns):
 
 async def create_app_body_ui_from_tpf(doc, tpf, magnitude_limit=None, catalogs=None):
     # set at info level, as it might be useful to gather statistics on the type of tpfs being plotted ()
+    # Tmag / shape: serve as a proxy of the size of the TPF: It becomes a factor in Google Cloud Run
+    # , where TPFs are downloaded to in-memory file systems with limited space.
     log.info(
         f"Plot Skyview: {tpf}, sector={tpf.meta.get('SECTOR')}, exptime={get_exptime(tpf)}, TessCut={is_tesscut(tpf)}"
+        f", Tmag={tpf.meta.get('TESSMAG', -99):.1f}, shape={tpf.flux.shape}"
     )
 
     if magnitude_limit is None:
